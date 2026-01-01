@@ -25,7 +25,7 @@ Full-featured structured logging with journald integration, JSON output, file ro
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/foundation/logging.sh
 
@@ -201,7 +201,7 @@ log_error "This will appear"
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /opt/toolkit/foundation/logging.sh
 

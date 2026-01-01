@@ -15,7 +15,7 @@ Production-ready Bash libraries for logging, file operations, error handling, al
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Source the libraries
 source /path/to/bash-production-toolkit/src/foundation/logging.sh

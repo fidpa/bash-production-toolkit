@@ -6,7 +6,7 @@ Utilities for relative path calculation, path validation, and markdown-aware pat
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/utilities/path-calculator.sh
 
@@ -249,7 +249,7 @@ source /path/to/path-calculator.sh
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/path-calculator.sh
 
@@ -286,7 +286,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/path-calculator.sh
 
@@ -318,7 +318,7 @@ find docs -name "*.md" -exec bash -c 'fix_absolute_links "$0" > "$0.tmp" && mv "
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/path-calculator.sh
 
@@ -351,7 +351,7 @@ generate_toc docs docs/TOC.md
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/path-calculator.sh
 
@@ -399,7 +399,7 @@ generate_breadcrumbs "/project/docs/how-to/network/setup.md"
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/path-calculator.sh
 

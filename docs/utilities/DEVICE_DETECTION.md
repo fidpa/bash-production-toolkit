@@ -6,7 +6,7 @@ Multi-strategy device detection for scripts that run across different hosts. Sup
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/utilities/device-detection.sh
 
@@ -250,7 +250,7 @@ device=$(detect_device)  # Always returns "router"
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/device-detection.sh
 
@@ -293,7 +293,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/device-detection.sh
 
@@ -309,7 +309,7 @@ chmod +x /usr/local/bin/myapp
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/device-detection.sh
 
@@ -394,7 +394,7 @@ esac
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/device-detection.sh
 source /path/to/monitoring/alerts.sh

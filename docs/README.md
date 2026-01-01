@@ -6,7 +6,7 @@ A collection of production-ready Bash libraries for logging, file operations, er
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Source the libraries you need
 source /path/to/bash-production-toolkit/src/foundation/logging.sh
@@ -111,7 +111,7 @@ src/
 
 - Linux (primary target)
 - macOS (simple-logging.sh, path-calculator.sh)
-- Works with `set -euo pipefail` (strict mode safe)
+- Works with `set -uo pipefail` (explicit error handling)
 
 ## License
 

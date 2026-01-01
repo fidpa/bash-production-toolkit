@@ -6,7 +6,7 @@ Advanced event tracking with grace periods, aggregation, and intelligent recover
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh
@@ -260,7 +260,7 @@ Events are stored as JSON:
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh
@@ -297,7 +297,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh
@@ -330,7 +330,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh
@@ -375,7 +375,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh

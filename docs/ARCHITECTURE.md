@@ -84,7 +84,7 @@ source /path/to/error-handling.sh  # Also sources logging.sh internally
 - Provide error messages via dedicated error functions
 
 **Scripts** (your code):
-- Can use `set -euo pipefail` safely
+- Use `set -uo pipefail` (explicit error handling)
 - Handle library return codes appropriately
 - Decide when to exit
 
@@ -202,7 +202,7 @@ When using multiple libraries, source in dependency order:
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 TOOLKIT="/path/to/bash-production-toolkit/src"
 
@@ -265,7 +265,7 @@ VERBOSE=true bash /path/to/path-calculator.sh
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/logging.sh
 

@@ -40,7 +40,7 @@ sudo chmod 755 /usr/local/lib/bash-production-toolkit/*/
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # Define toolkit location
 TOOLKIT="${TOOLKIT:-/path/to/bash-production-toolkit/src}"
@@ -226,7 +226,7 @@ STATE_DIR=/var/lib/alerts
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 TOOLKIT="${1:-./src}"
 

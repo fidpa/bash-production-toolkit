@@ -6,7 +6,7 @@ Atomic file operations library preventing race conditions, partial writes, and s
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/foundation/secure-file-utils.sh
 

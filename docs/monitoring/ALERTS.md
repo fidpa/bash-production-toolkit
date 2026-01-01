@@ -6,7 +6,7 @@ Telegram alerting with rate limiting, smart deduplication, and recovery notifica
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
@@ -189,7 +189,7 @@ $STATE_DIR/
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
@@ -223,7 +223,7 @@ fi
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
@@ -242,7 +242,7 @@ done
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
@@ -270,7 +270,7 @@ fi
 
 ```bash
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
