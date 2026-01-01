@@ -4,7 +4,7 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Error Handling Library
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Purpose:
 #   Domain-specific error handling with recovery suggestions for
@@ -37,6 +37,10 @@
 #   60 - Service error
 #
 # Changelog:
+#   v1.0.1 (2026-01-01): Documentation Improvements
+#     - IMPROVED: Changelog format for backwards compatibility clarity
+#     - ALIGNED: With server repo v2.0.0 best practices
+#     - NO CODE CHANGES: Fully backwards compatible
 #   v1.0.0 (2026-01-01): Initial public release
 
 # ============================================================================
@@ -57,6 +61,13 @@ else
     echo "FATAL: logging.sh not found" >&2
     return 1
 fi
+
+# ============================================================================
+# COMPATIBILITY ALIASES
+# ============================================================================
+# These aliases are maintained for backwards compatibility with calling scripts.
+# The actual implementations are provided by logging.sh (log_warn, log_error).
+# No additional code needed - this section documents the compatibility layer.
 
 # ============================================================================
 # ERROR CODES

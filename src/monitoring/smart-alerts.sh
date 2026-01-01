@@ -4,7 +4,7 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Smart Alerts Library
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # Purpose:
 #   Intelligent alert management to reduce alert fatigue through
@@ -36,6 +36,11 @@
 #   SMART_ALERT_ENABLED          - Enable/disable smart alerts (default: true)
 #
 # Changelog:
+#   v1.0.1 (2026-01-01): Dependency Loading Improvements
+#     - FIX: Explicit error handling for secure-file-utils.sh dependency
+#     - ADDED: Function check (declare -F sfu_write_file) before sourcing
+#     - IMPROVED: Clear error messages when dependencies are missing
+#     - ALIGNED: With server repo v1.1.1 best practices
 #   v1.0.0 (2026-01-01): Initial public release
 
 set -uo pipefail
@@ -92,8 +97,18 @@ if [[ -f "${_SA_LIB_DIR}/../foundation/logging.sh" ]]; then
     source "${_SA_LIB_DIR}/../foundation/logging.sh" 2>/dev/null || true
 fi
 
-if [[ -f "${_SA_LIB_DIR}/../foundation/secure-file-utils.sh" ]]; then
-    source "${_SA_LIB_DIR}/../foundation/secure-file-utils.sh" 2>/dev/null || true
+# Load secure-file-utils.sh with strict error handling (required for sfu_write_file)
+if ! declare -F sfu_write_file >/dev/null 2>&1; then
+    if [[ -f "${_SA_LIB_DIR}/../foundation/secure-file-utils.sh" ]]; then
+        # shellcheck source=../foundation/secure-file-utils.sh
+        source "${_SA_LIB_DIR}/../foundation/secure-file-utils.sh" || {
+            echo "ERROR: Failed to source secure-file-utils.sh" >&2
+            return 1
+        }
+    else
+        echo "ERROR: secure-file-utils.sh not found at ${_SA_LIB_DIR}/../foundation/secure-file-utils.sh" >&2
+        return 1
+    fi
 fi
 
 if [[ -f "${_SA_LIB_DIR}/alerts.sh" ]]; then
