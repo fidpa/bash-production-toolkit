@@ -1,0 +1,30 @@
+# Test outputs
+*.tmp
+*.log
+test-output/
+
+# Local configs
+config.local
+*.env
+!*.example.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+
+# Build artifacts
+*.bak
+
+# Personal/marketing content
+REDDIT_POST.md
+LINKEDIN_POST.md
