@@ -2,7 +2,7 @@
 # =============================================================================
 # backup-safety.sh - Backup Target Validation Library
 # =============================================================================
-# Version: 1.0.0
+# Version: 1.1.0
 # License: MIT
 # Repository: https://github.com/fidpa/bash-production-toolkit
 #
@@ -17,9 +17,17 @@
 #
 # Features:
 #   - Mountpoint validation (CRITICAL: prevents root partition writes)
-#   - Root partition detection
+#   - Root partition detection (works even if path doesn't exist yet)
 #   - Disk space checks with device-aware plausibility
 #   - Configurable backup base directory
+#
+# Changelog:
+#   v1.1.0 (02.01.2026): Robustness improvements
+#     - is_on_root_partition: Probe parent path if target doesn't exist
+#     - check_mountpoint: command -v guard + /proc/self/mounts fallback
+#     - _bs_extract_base_mount: Handle edge case /mnt or /mnt/
+#     - min_free_gb: Numeric validation
+#   v1.0.0 (02.01.2026): Initial release
 #
 # Usage:
 #   source backup-safety.sh
@@ -31,7 +39,7 @@
 #
 # Dependencies:
 #   - Bash 4.0+
-#   - Standard Unix tools: df, stat, mountpoint, mkdir
+#   - Standard Unix tools: df, stat, mountpoint (optional), mkdir
 #
 # =============================================================================
 
@@ -59,6 +67,10 @@ _bs_extract_base_mount() {
 
     local rest="${path#/mnt/}"          # backup/data
     local first_component="${rest%%/*}" # backup
+
+    # Handle edge case: /mnt or /mnt/ → empty component
+    [[ -z "$first_component" ]] && return 1
+
     printf '/mnt/%s' "$first_component"
 }
 
@@ -90,21 +102,16 @@ check_mountpoint() {
     local mount_path="$1"
     [[ -z "$mount_path" ]] && { _bs_err "check_mountpoint: Missing argument"; return 1; }
 
-    # Method 1: mountpoint command (most reliable)
-    if mountpoint -q "$mount_path" 2>/dev/null; then
-        return 0
+    # Method 1: mountpoint command (most reliable, if available)
+    if command -v mountpoint >/dev/null 2>&1; then
+        mountpoint -q "$mount_path" && return 0
+        return 1
     fi
 
-    # Method 2: Fallback - Check if different device than root
-    # This catches cases where mountpoint command isn't available
-    if [[ -d "$mount_path" ]]; then
-        local mount_dev root_dev
-        mount_dev=$(stat -c '%d' "$mount_path" 2>/dev/null)
-        root_dev=$(stat -c '%d' "/" 2>/dev/null)
-        [[ "$mount_dev" != "$root_dev" ]] && return 0
-    fi
-
-    return 1
+    # Method 2: Fallback - Check /proc/self/mounts (more accurate than stat)
+    [[ -d "$mount_path" ]] || return 1
+    # shellcheck disable=SC1003
+    grep -qsE "[[:space:]]${mount_path//\//\\/}[[:space:]]" /proc/self/mounts
 }
 
 # =============================================================================
@@ -115,8 +122,8 @@ check_mountpoint() {
 #
 # Performs comprehensive checks before allowing backup writes:
 # 1. Mountpoint validation (for /mnt/* paths)
-# 2. Root partition detection (warning)
-# 3. Directory accessibility (create if needed)
+# 2. Directory accessibility (create if needed)
+# 3. Root partition detection (warning)
 # 4. Write permissions
 # 5. Disk space (with large device plausibility check)
 #
@@ -125,7 +132,7 @@ check_mountpoint() {
 #
 # Arguments:
 #   $1 - target path (required)
-#   $2 - minimum free GB (default: $BACKUP_MIN_FREE_GB or 10)
+#   $2 - minimum free GB (default: $BACKUP_MIN_FREE_GB or 10, must be numeric)
 #   $3 - verbose mode: "true" for detailed output (default: "false")
 #
 # Returns:
@@ -145,6 +152,9 @@ check_backup_target() {
     local verbose="${3:-false}"
 
     [[ -z "$target_path" ]] && { _bs_err "check_backup_target: Missing argument: path"; return 1; }
+
+    # Validate min_free_gb is numeric
+    [[ "$min_free_gb" =~ ^[0-9]+$ ]] || { _bs_err "min_free_gb must be numeric, got: $min_free_gb"; return 1; }
 
     # Helper for verbose output
     _log() { [[ "$verbose" == "true" ]] && _bs_info "$@"; }
@@ -174,17 +184,8 @@ check_backup_target() {
         _log "Check 1/4: Mountpoint (skipped - not /mnt/* path)"
     fi
 
-    # Check 2: Root partition detection
-    _log "Check 2/4: Root partition detection..."
-    if is_on_root_partition "$target_path"; then
-        _bs_warn "$target_path is on root partition"
-        [[ "$verbose" == "true" ]] && _bs_info "  ⚠ WARNING: On root partition"
-    else
-        _log "  ✓ Not on root partition"
-    fi
-
-    # Check 3: Directory exists or can be created
-    _log "Check 3/4: Directory accessibility..."
+    # Check 2: Directory exists or can be created (BEFORE root check!)
+    _log "Check 2/4: Directory accessibility..."
     if [[ ! -d "$target_path" ]]; then
         if ! mkdir -p "$target_path" 2>/dev/null; then
             _bs_err "Cannot create directory $target_path"
@@ -196,6 +197,15 @@ check_backup_target() {
         return 1
     fi
     _log "  ✓ Accessible and writable"
+
+    # Check 3: Root partition detection (AFTER mkdir, so path exists)
+    _log "Check 3/4: Root partition detection..."
+    if is_on_root_partition "$target_path"; then
+        _bs_warn "$target_path is on root partition"
+        [[ "$verbose" == "true" ]] && _bs_info "  ⚠ WARNING: On root partition"
+    else
+        _log "  ✓ Not on root partition"
+    fi
 
     # Check 4: Disk space (single df call for efficiency)
     _log "Check 4/4: Disk space (minimum ${min_free_gb}GB)..."
@@ -244,6 +254,7 @@ pre_backup_checks() {
 # =============================================================================
 
 # Check if a path is on the root partition
+# Robust: If path doesn't exist, probe nearest existing parent
 #
 # Usage:
 #   if is_on_root_partition "/opt/backup"; then
@@ -258,11 +269,18 @@ is_on_root_partition() {
     local path="$1"
     [[ -z "$path" ]] && { _bs_err "is_on_root_partition: Missing argument"; return 1; }
 
+    # If target doesn't exist, find nearest existing parent
+    local probe="$path"
+    while [[ ! -e "$probe" && "$probe" != "/" ]]; do
+        probe="${probe%/*}"
+        [[ -z "$probe" ]] && probe="/"
+    done
+
     local path_dev root_dev
-    path_dev=$(df -P "$path" 2>/dev/null | awk 'NR==2{print $1}')
+    path_dev=$(df -P "$probe" 2>/dev/null | awk 'NR==2{print $1}')
     root_dev=$(df -P "/" 2>/dev/null | awk 'NR==2{print $1}')
 
-    [[ "$path_dev" == "$root_dev" ]]
+    [[ -n "$path_dev" && "$path_dev" == "$root_dev" ]]
 }
 
 # Strict check: Fail if path is on root partition
