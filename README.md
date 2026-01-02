@@ -62,6 +62,7 @@ source "${TOOLKIT}/foundation/logging.sh"
 
 | Library | Purpose |
 |---------|---------|
+| [backup-safety.sh](docs/utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks |
 | [device-detection.sh](docs/utilities/DEVICE_DETECTION.md) | Multi-device identification and routing |
 | [path-calculator.sh](docs/utilities/PATH_CALCULATOR.md) | Path manipulation for documentation tools |
 
