@@ -355,6 +355,110 @@ fi
 mkdir -p "${STATE_DIR:-/var/lib/alerts}"
 ```
 
+## Real-World Examples
+
+### AIDE Failure Alerting
+
+Production-grade integration with AIDE file integrity monitoring (from [ubuntu-server-security](https://github.com/fidpa/ubuntu-server-security)).
+
+**Use Case**: Instant Telegram alerts when AIDE database updates fail, triggered via systemd OnFailure hook.
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# Bash Production Toolkit path
+BASH_TOOLKIT_PATH="${BASH_TOOLKIT_PATH:-/usr/local/lib/bash-production-toolkit}"
+
+# Import libraries
+source "${BASH_TOOLKIT_PATH}/src/foundation/logging.sh"
+source "${BASH_TOOLKIT_PATH}/src/monitoring/alerts.sh"
+
+# Configuration
+export TELEGRAM_PREFIX="[🚨 AIDE]"
+export STATE_DIR="/var/lib/aide"
+export RATE_LIMIT_SECONDS=3600  # 1h Rate Limit (prevents spam)
+
+main() {
+    log_info "AIDE Failure Alert"
+
+    # Get service status
+    local exit_code
+    exit_code=$(systemctl show aide-update.service -p ExecMainStatus --value)
+
+    local active_state
+    active_state=$(systemctl show aide-update.service -p ActiveState --value)
+
+    # Get hostname
+    local hostname
+    hostname=$(hostname -f 2>/dev/null || hostname)
+
+    # Construct alert message
+    local alert_msg
+    alert_msg="⚠️ AIDE File Integrity Check FAILED!
+
+🖥️ Device: ${hostname}
+❌ Status: ${active_state}
+🔢 Exit Code: ${exit_code}
+⏰ Time: $(date '+%Y-%m-%d %H:%M:%S')
+
+⚡ Critical: File Integrity Monitoring non-functional!
+
+📋 Logs:
+journalctl -u aide-update.service -n 50"
+
+    # Send alert with rate limiting
+    if send_telegram_alert "aide-failure" "$alert_msg" "🚨"; then
+        log_info "✅ Telegram alert sent successfully"
+    else
+        log_error "❌ Failed to send Telegram alert"
+        return 1
+    fi
+}
+
+main "$@"
+```
+
+**systemd Integration**:
+
+```ini
+# /etc/systemd/system/aide-update.service
+[Unit]
+Description=AIDE Database Update
+OnFailure=aide-failure-alert.service
+
+# ... rest of service config
+```
+
+```ini
+# /etc/systemd/system/aide-failure-alert.service
+[Unit]
+Description=AIDE Failure Alert
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/aide/aide-failure-alert.sh
+
+# Credentials (Option 1: Simple ENV vars)
+Environment="TELEGRAM_BOT_TOKEN=your-bot-token"
+Environment="TELEGRAM_CHAT_ID=your-chat-id"
+
+# Credentials (Option 2: Vaultwarden - see ubuntu-server-security docs)
+# Environment="VAULTWARDEN_URL=https://vault.example.com"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Features Demonstrated**:
+- ✅ Rate limiting (1 alert per hour) prevents Telegram spam
+- ✅ Systemd OnFailure hook for instant triggering (<1s latency)
+- ✅ Rich context (hostname, exit code, logs)
+- ✅ Production logging via logging.sh
+- ✅ Two configuration modes (simple ENV vars vs. Vaultwarden)
+
+**Full Implementation**: See [ubuntu-server-security/docs/FAILURE_ALERTING.md](https://github.com/fidpa/ubuntu-server-security/blob/main/docs/FAILURE_ALERTING.md)
+
 ## See Also
 
 - [SMART_ALERTS.md](SMART_ALERTS.md) - Advanced event tracking with grace periods
