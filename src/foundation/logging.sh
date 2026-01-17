@@ -4,12 +4,17 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Advanced Logging Library
-# Version: 1.1.0 (Updated: 01.01.2026 - Feature: 6 new functions)
+# Version: 1.2.0 (Updated: 17.01.2026 - Bug fixes + log_json fields support)
+# Changelog v1.2.0 (17.01.2026): Bug fixes and feature enhancement
+#   - FIX: check_log_rotation() now uses LOG_DIR instead of undefined DEFAULT_LOG_DIR
+#   - FEATURE: log_json() now supports additional fields (key=value pairs)
+#   - DOCS: Removed unimplemented "Prometheus metrics export" claim
+#   - DOCS: Clarified log rotation is manual (not automatic)
 # Changelog v1.1.0 (01.01.2026): Feature additions from server repo v2.9.0
 #   - NEW: time_function() - Function performance measurement
 #   - NEW: log_debug_structured(), log_warn_structured(), log_critical_structured()
 #   - NEW: extract_script_version() - Auto-extract version from script headers
-#   - NEW: check_log_rotation() - Automatic size-based log rotation
+#   - NEW: check_log_rotation() - Manual size-based log rotation
 #   - TOTAL: +6 functions, +74 lines, 100% generic (no internal dependencies)
 # Changelog v1.0.1 (01.01.2026): Documentation + dependency improvements
 # Changelog v1.0.0 (01.01.2026): Initial public release
@@ -24,8 +29,7 @@
 #   - journald integration (systemd-cat, logger)
 #   - JSON output format
 #   - Performance metrics tracking
-#   - Log rotation
-#   - Prometheus metrics export
+#   - Log rotation (manual via check_log_rotation)
 #   - Correlation IDs for distributed tracing
 #
 # Usage:
@@ -299,7 +303,9 @@ log_with_fallback() {
 log_json() {
     local level="$1"
     shift
-    local message="$*"
+    local message="$1"
+    shift
+
     local timestamp
     timestamp=$(date -Iseconds)
     local hostname
@@ -308,8 +314,21 @@ log_json() {
     local escaped_message
     escaped_message=$(json_escape "$message")
 
+    # Parse additional fields (key=value pairs)
+    local fields=""
+    while [[ $# -gt 0 ]]; do
+        if [[ "$1" == *"="* ]]; then
+            local key="${1%%=*}"
+            local value="${1#*=}"
+            local escaped_value
+            escaped_value=$(json_escape "$value")
+            fields="${fields},\"${key}\":\"${escaped_value}\""
+        fi
+        shift
+    done
+
     local json_log
-    json_log="{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"message\":\"$escaped_message\",\"hostname\":\"$hostname\",\"script\":\"${SCRIPT_NAME:-unknown}\",\"pid\":$$}"
+    json_log="{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"message\":\"$escaped_message\",\"hostname\":\"$hostname\",\"script\":\"${SCRIPT_NAME:-unknown}\",\"pid\":$$${fields}}"
 
     if [[ "${LOG_TO_STDOUT:-true}" == "true" ]]; then
         echo "$json_log"
@@ -562,7 +581,7 @@ extract_script_version() {
 
 # Check and rotate log file based on size
 check_log_rotation() {
-    local log_file="${1:-${LOG_FILE:-${DEFAULT_LOG_DIR}/script.log}}"
+    local log_file="${1:-${LOG_FILE:-${LOG_DIR}/script.log}}"
 
     if [[ ! -f "$log_file" ]]; then
         return 0

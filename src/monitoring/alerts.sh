@@ -4,7 +4,10 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Alerts Library
-# Version: 1.0.0
+# Version: 1.0.1 (Updated: 17.01.2026 - Bug fix)
+# Changelog v1.0.1 (17.01.2026): send_recovery_alert default message
+#   - FIX: send_recovery_alert() now has default message "Recovered" (matches docs)
+# Changelog v1.0.0 (01.01.2026): Initial public release
 #
 # Purpose:
 #   Telegram alerting with rate limiting and smart deduplication
@@ -244,7 +247,7 @@ send_smart_alert() {
 send_recovery_alert() {
     local alert_type="$1"
     local identifier="$2"
-    local message="$3"
+    local message="${3:-Recovered}"
 
     if [[ "${ENABLE_RECOVERY_ALERTS}" != "true" ]]; then
         log_debug "Recovery alerts disabled"

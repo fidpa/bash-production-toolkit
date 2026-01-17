@@ -1,6 +1,6 @@
 # Smart Alerts Library (v1.1.0)
 
-Advanced event tracking with grace periods, aggregation, and intelligent recovery detection. Prevents alert fatigue from transient issues.
+Advanced event tracking with grace periods and intelligent recovery detection. Prevents alert fatigue from transient issues.
 
 ## Quick Start
 
@@ -69,7 +69,7 @@ source /path/to/bash-production-toolkit/src/monitoring/smart-alerts.sh
 | `SMART_ALERT_ENABLED` | `true` | Enable/disable smart alerts |
 | `SMART_ALERT_GRACE_PERIOD` | `180` | Seconds before first alert (3 min) |
 | `SMART_ALERT_RECOVERY_THRESHOLD` | `300` | Min downtime for recovery alert (5 min) |
-| `SMART_ALERT_AGGREGATION_WINDOW` | `300` | Event aggregation window (5 min) |
+| `SMART_ALERT_AGGREGATION_WINDOW` | `300` | Event aggregation window (5 min) - reserved for future use |
 | `SMART_ALERT_STATE_DIR` | `/var/lib/smart-alerts` | State file directory |
 
 ### Configuration Examples
@@ -152,7 +152,6 @@ Process pending events and send alerts for exceeded grace periods.
 **Behavior:**
 1. Scans pending events
 2. If grace period exceeded: sends alert, marks as "alerted"
-3. Aggregates multiple events if within aggregation window
 
 **Example:**
 ```bash
@@ -444,7 +443,7 @@ done
 |---------|-----------|-----------------|
 | Rate limiting | Time-based | Event-based |
 | Grace periods | No | Yes |
-| Event aggregation | No | Yes |
+| Event aggregation | No | Planned |
 | Recovery tracking | Basic | Advanced (downtime-aware) |
 | State persistence | Minimal | Full event history |
 | Best for | Simple alerts | Complex monitoring |

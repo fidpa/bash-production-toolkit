@@ -1,7 +1,7 @@
 # Logging Libraries
 
 This document covers two logging libraries:
-- **logging.sh** (v2.8.1) - Full-featured structured logging
+- **logging.sh** (v1.1.0) - Full-featured structured logging
 - **simple-logging.sh** (v1.1.1) - Lightweight logging for simple scripts
 
 ## Quick Decision Guide
@@ -153,7 +153,7 @@ Escape a string for safe JSON embedding.
 
 #### get_log_level_value
 ```bash
-value=$(get_log_level_value "WARN")  # Returns 30
+value=$(get_log_level_value "WARN")  # Returns 2
 ```
 Convert level string to numeric value for comparison.
 
@@ -179,11 +179,11 @@ Convert level string to numeric value for comparison.
 
 | Level | Value | Use For |
 |-------|-------|---------|
-| DEBUG | 10 | Detailed debugging information |
-| INFO | 20 | General operational messages |
-| WARN | 30 | Warning conditions |
-| ERROR | 40 | Error conditions |
-| CRITICAL | 50 | Critical failures |
+| DEBUG | 0 | Detailed debugging information |
+| INFO | 1 | General operational messages |
+| WARN | 2 | Warning conditions |
+| ERROR | 3 | Error conditions |
+| CRITICAL | 4 | Critical failures |
 
 ### Level Filtering
 
