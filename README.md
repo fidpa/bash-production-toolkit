@@ -1,9 +1,12 @@
 # Bash Production Toolkit
 
+![CI](https://github.com/fidpa/bash-production-toolkit/actions/workflows/lint.yml/badge.svg)
+![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-brightgreen?logo=gnu-bash)
+![Release](https://img.shields.io/github/v/release/fidpa/bash-production-toolkit)
+![Maintained](https://img.shields.io/badge/Maintained-yes-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Bash 4.0+](https://img.shields.io/badge/Bash-4.0%2B-blue?logo=gnu-bash)
 ![Libraries](https://img.shields.io/badge/Libraries-8-orange)
-![CI](https://github.com/fidpa/bash-production-toolkit/actions/workflows/lint.yml/badge.svg)
 
 Production-ready Bash libraries for logging, file operations, error handling, alerting, and system detection.
 
