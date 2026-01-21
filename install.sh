@@ -1,8 +1,56 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 Marc Allgeier
 set -uo pipefail
 
 # install.sh - Installation script for Bash Production Toolkit
 # Usage: ./install.sh [--prefix DIR] [--skip-completion]
+
+# Color codes for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m' # No Color
+
+# Logging functions
+log() {
+    echo -e "${BLUE}[INFO]${NC} $*"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*" >&2
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $*" >&2
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $*"
+}
+
+# Prerequisites check
+check_prerequisites() {
+    log "Checking prerequisites..."
+
+    # Check Bash version (require 4.0+)
+    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+        error "Bash 4.0+ required (found: ${BASH_VERSION})"
+        exit 1
+    fi
+    success "Bash version: ${BASH_VERSION}"
+
+    # Check required commands
+    local required_commands=("mkdir" "cp" "chmod" "cat")
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            error "Required command not found: $cmd"
+            exit 1
+        fi
+    done
+    success "All required commands available"
+}
 
 # Default installation directory
 PREFIX="${HOME}/.local/share/bash-production-toolkit"
@@ -42,49 +90,53 @@ EOF
             exit 0
             ;;
         *)
-            echo "Error: Unknown option: $1" >&2
+            error "Unknown option: $1"
             echo "Run './install.sh --help' for usage information." >&2
             exit 1
             ;;
     esac
 done
 
+# Check prerequisites before installation
+check_prerequisites
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "=== Bash Production Toolkit Installation ==="
-echo "Installation directory: $PREFIX"
+echo
+echo -e "${BLUE}=== Bash Production Toolkit Installation ===${NC}"
+log "Installation directory: $PREFIX"
 echo
 
 # Create installation directory
 if [[ ! -d "$PREFIX" ]]; then
-    echo "Creating installation directory..."
+    log "Creating installation directory..."
     mkdir -p "$PREFIX" || {
-        echo "Error: Failed to create directory $PREFIX" >&2
+        error "Failed to create directory $PREFIX"
         exit 1
     }
 fi
 
 # Copy libraries
-echo "Installing libraries..."
+log "Installing libraries..."
 cp -r "$SCRIPT_DIR/src" "$PREFIX/" || {
-    echo "Error: Failed to copy libraries" >&2
+    error "Failed to copy libraries"
     exit 1
 }
 
 # Copy examples (optional)
 if [[ -d "$SCRIPT_DIR/examples" ]]; then
-    echo "Installing examples..."
+    log "Installing examples..."
     cp -r "$SCRIPT_DIR/examples" "$PREFIX/" || {
-        echo "Warning: Failed to copy examples" >&2
+        warn "Failed to copy examples"
     }
 fi
 
 # Copy documentation
 if [[ -d "$SCRIPT_DIR/docs" ]]; then
-    echo "Installing documentation..."
+    log "Installing documentation..."
     cp -r "$SCRIPT_DIR/docs" "$PREFIX/" || {
-        echo "Warning: Failed to copy documentation" >&2
+        warn "Failed to copy documentation"
     }
 fi
 
@@ -106,9 +158,9 @@ INIT_SCRIPT
 chmod 644 "$PREFIX/init.sh"
 
 echo
-echo "✓ Installation complete!"
+success "Installation complete!"
 echo
-echo "Next steps:"
+echo -e "${BLUE}Next steps:${NC}"
 echo "1. Add to your .bashrc or .bash_profile:"
 echo "   export BASH_PRODUCTION_TOOLKIT=\"${PREFIX}\""
 echo "   source \"\${BASH_PRODUCTION_TOOLKIT}/init.sh\""
@@ -125,8 +177,8 @@ echo
 if [[ "$SKIP_COMPLETION" == "false" ]]; then
     COMPLETION_DIR="${HOME}/.local/share/bash-completion/completions"
     if [[ -d "$COMPLETION_DIR" ]] || mkdir -p "$COMPLETION_DIR" 2>/dev/null; then
-        echo "Note: Bash completion can be added manually if needed."
-        echo "Completion directory: $COMPLETION_DIR"
+        log "Bash completion can be added manually if needed."
+        log "Completion directory: $COMPLETION_DIR"
     fi
 fi
 

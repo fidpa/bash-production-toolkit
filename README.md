@@ -104,6 +104,20 @@ See the [examples/](examples/) directory for ready-to-run scripts:
 ./examples/03-telegram-alerts.sh
 ```
 
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+- 🐛 **Bug Reports**: [Open an issue](https://github.com/fidpa/bash-production-toolkit/issues/new?template=bug_report.md)
+- 💡 **Feature Requests**: [Request a feature](https://github.com/fidpa/bash-production-toolkit/issues/new?template=feature_request.md)
+- 🔧 **Pull Requests**: Fork, make changes, submit PR
+
+## Support
+
+- 📖 **Documentation**: [docs/](docs/)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/fidpa/bash-production-toolkit/issues)
+- 🔒 **Security**: See [SECURITY.md](SECURITY.md)
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

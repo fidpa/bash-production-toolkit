@@ -1,5 +1,11 @@
 # Bash Production Toolkit Documentation
 
+## ⚡ TL;DR
+
+8 production-ready Bash libraries: logging.sh (journald/JSON), secure-file-utils.sh (atomic writes), alerts.sh (Telegram rate-limited), device-detection.sh (multi-host). Source what you need, use immediately.
+
+---
+
 A collection of production-ready Bash libraries for logging, file operations, error handling, alerting, and system detection.
 
 ## Quick Start
@@ -139,3 +145,11 @@ MIT License - See [LICENSE](../LICENSE) for details.
 
 ### Examples
 - [Examples README](../examples/README.md) - Ready-to-run example scripts
+
+## See Also
+
+- [Back to Root README](../README.md)
+- [Source Libraries](../src/README.md)
+- [Examples](../examples/README.md)
+- [Contributing](../CONTRIBUTING.md)
+- [License](../LICENSE)

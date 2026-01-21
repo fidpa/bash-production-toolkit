@@ -1,5 +1,11 @@
 # Setup Guide
 
+## ⚡ TL;DR
+
+Clone repo → Source libraries → Configure env vars (TELEGRAM_*) → Create state dirs (/var/lib/alerts) → Integrate with systemd. Prerequisites: Bash 4.0+, optional jq/curl.
+
+---
+
 Complete installation and configuration guide for the Bash Production Toolkit.
 
 ## Prerequisites
