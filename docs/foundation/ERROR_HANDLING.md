@@ -1,4 +1,4 @@
-# Error Handling Library (v2.0.0)
+# Error Handling Library (v1.0.1)
 
 Domain-specific error handlers for Docker, network, and systemd services with automatic diagnostics and recovery suggestions.
 
@@ -464,12 +464,11 @@ source /path/to/logging.sh
 source /path/to/error-handling.sh
 source /path/to/monitoring/alerts.sh
 
-export TELEGRAM_BOT_TOKEN="your-token"
-export TELEGRAM_CHAT_ID="your-chat"
+export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
 
 if ! docker start nginx; then
     handle_docker_error "nginx" "Container failed to start"
-    send_telegram_alert "docker_error" "nginx container failed to start" "🚨"
+    send_alert "DOCKER_ERROR" "nginx container failed to start"
     exit $ERROR_DOCKER
 fi
 ```

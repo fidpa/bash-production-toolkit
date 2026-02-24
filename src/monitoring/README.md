@@ -2,7 +2,7 @@
 
 ## ⚡ TL;DR
 
-Alerting libraries for production systems: alerts.sh (Telegram alerts with rate limiting, deduplication, 3h default), smart-alerts.sh (event tracking with grace periods, recovery detection). Prevent alert fatigue via state-based deduplication.
+Alerting libraries for production systems: alerts.sh (generic webhook alerts with rate limiting, severity auto-derivation), smart-alerts.sh (event tracking with grace periods, recovery detection). Prevent alert fatigue via state-based deduplication.
 
 ---
 
@@ -10,37 +10,40 @@ Alerting libraries for production systems: alerts.sh (Telegram alerts with rate 
 
 Monitoring libraries provide intelligent alerting for production systems:
 
-- **Rate-Limited Alerts** - Prevent alert fatigue via deduplication
+- **Rate-Limited Alerts** - Prevent alert fatigue via configurable cooldown
 - **Event Tracking** - Grace periods for transient issues
 - **Recovery Detection** - Automatic recovery alerts
 - **State Management** - Persistent state via `/var/lib/` directories
+- **Vendor-Agnostic** - Works with Mattermost, Slack, Discord, or any Slack-compatible webhook
 
 ## Libraries
 
 ### alerts.sh
 
-**Purpose**: Telegram alerts with rate limiting and deduplication
+**Purpose**: Generic webhook alerts with rate limiting and severity auto-derivation
 
 **Key Features**:
-- Telegram Bot API integration via `curl`
-- Rate limiting (default: 3 hours, configurable)
-- Alert deduplication (same message won't spam)
+- Slack-compatible JSON webhook delivery via `curl`
+- Severity auto-derived from alert type name (`*_FAILED`→error, `*_RECOVERED`→notice, etc.)
+- Rate limiting (default: 30 min, configurable per alert type)
 - State persistence via `/var/lib/alerts/`
 - Recovery alerts (optional)
+- Self-signed TLS support via `ALERT_WEBHOOK_CACERT`
 - Performance: ~0.5s per alert (network latency)
 
 **Key Functions**:
 ```bash
-send_telegram_alert "message"                   # Send alert (no deduplication)
-send_alert_deduplicated "message" [interval]    # Rate-limited alert (default: 3h)
-mark_alert_recovered "alert_id"                 # Mark issue as recovered
+send_alert "ALERT_TYPE" "message"              # Send alert (severity auto-derived)
+send_recovery_alert "type" "id" ["message"]    # Send recovery notification
+clear_rate_limit "alert_type"                  # Reset rate limit for testing
 ```
 
 **Configuration**:
 ```bash
-export TELEGRAM_BOT_TOKEN="your_bot_token"      # Required
-export TELEGRAM_CHAT_ID="your_chat_id"          # Required
-export ALERTS_STATE_DIR="/var/lib/alerts"       # Optional (default)
+export ALERT_WEBHOOK_URL="https://your-endpoint/TOKEN"  # Required
+export ALERT_WEBHOOK_CACERT="/path/to/ca.crt"           # Optional (self-signed TLS)
+export ALERTS_PREFIX="[System]"                         # Optional (default)
+export RATE_LIMIT_SECONDS=1800                          # Optional (default: 30 min)
 ```
 
 **Documentation**: [ALERTS.md](../../docs/monitoring/ALERTS.md)
@@ -52,49 +55,47 @@ export ALERTS_STATE_DIR="/var/lib/alerts"       # Optional (default)
 **Purpose**: Event tracking with grace periods and recovery detection
 
 **Key Features**:
-- Grace period handling (don't alert on transient issues)
-- Event tracking (count occurrences before alerting)
-- Automatic recovery detection
+- Grace period handling (don't alert on transient issues, default: 3 min)
+- Event state machine with JSON state files
+- Recovery threshold detection (only alert recovery if downtime > 5 min)
+- Aggregation window (collect events, send summary)
 - JSON state files via `jq`
-- Multiple event types per script
 - Performance: ~0.02s per tracking call
 
 **Key Functions**:
 ```bash
-track_event "event_id" "grace_period_seconds"   # Track event occurrence
-is_in_grace_period "event_id"                   # Check if in grace period
-clear_event "event_id"                          # Clear event (recovery)
-get_event_count "event_id"                      # Get occurrence count
+sa_register_event "type" "id" "message"        # Register event (starts grace period)
+sa_check_pending_alerts                        # Process pending events (call periodically)
+sa_register_recovery "type" "id" ["message"]   # Register recovery
 ```
 
 **Configuration**:
 ```bash
-export SMART_ALERTS_STATE_DIR="/var/lib/smart-alerts"  # Optional
+export SMART_ALERT_GRACE_PERIOD=180            # Seconds before alerting (default: 3 min)
+export SMART_ALERT_RECOVERY_THRESHOLD=300      # Min downtime for recovery alert (default: 5 min)
+export SMART_ALERT_STATE_DIR="/var/lib/smart-alerts"  # Optional
 ```
 
 **Documentation**: [SMART_ALERTS.md](../../docs/monitoring/SMART_ALERTS.md)
 
 ## Usage Example
 
-### Basic Telegram Alerts
+### Basic Webhook Alerts
 
 ```bash
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Source monitoring libraries
 TOOLKIT="/path/to/bash-production-toolkit/src"
 source "${TOOLKIT}/foundation/logging.sh"
 source "${TOOLKIT}/monitoring/alerts.sh"
 
-# Configure Telegram
-export TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-export TELEGRAM_CHAT_ID="-1001234567890"
+export ALERT_WEBHOOK_URL="https://mattermost.example.com/hooks/TOKEN"
 
-# Send rate-limited alert (won't spam if called multiple times within 3h)
+# Send rate-limited alert (severity auto-derived: *_DOWN → critical)
 if ! systemctl is-active --quiet my-service; then
     log_error "Service my-service is down"
-    send_alert_deduplicated "⚠️ Service my-service is down on $(hostname)"
+    send_alert "SERVICE_DOWN" "my-service is not running on $(hostname)"
 fi
 ```
 
@@ -104,55 +105,44 @@ fi
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Source monitoring libraries
 TOOLKIT="/path/to/bash-production-toolkit/src"
 source "${TOOLKIT}/foundation/logging.sh"
-source "${TOOLKIT}/monitoring/smart-alerts.sh"
 source "${TOOLKIT}/monitoring/alerts.sh"
+source "${TOOLKIT}/monitoring/smart-alerts.sh"
 
-# Configure
-export TELEGRAM_BOT_TOKEN="your_token"
-export TELEGRAM_CHAT_ID="your_chat_id"
+export ALERT_WEBHOOK_URL="https://mattermost.example.com/hooks/TOKEN"
+export SMART_ALERT_GRACE_PERIOD=300  # 5 minute grace period
 
-# Track events (5 minute grace period)
 SERVICE_NAME="my-service"
-GRACE_PERIOD=$((5 * 60))  # 5 minutes
 
 if ! systemctl is-active --quiet "$SERVICE_NAME"; then
     log_warn "Service $SERVICE_NAME is down"
-
-    # Track event (don't alert immediately)
-    track_event "$SERVICE_NAME-down" "$GRACE_PERIOD"
-
-    # Only alert if still down after grace period
-    if ! is_in_grace_period "$SERVICE_NAME-down"; then
-        send_alert_deduplicated "⚠️ Service $SERVICE_NAME down for >5min on $(hostname)"
-    fi
+    # Register event - alert only fires after grace period
+    sa_register_event "service_down" "$SERVICE_NAME" "Service $SERVICE_NAME is not running"
 else
-    # Service is up - clear event if it was tracked
-    if [[ -f "/var/lib/smart-alerts/${SERVICE_NAME}-down.json" ]]; then
-        log_success "Service $SERVICE_NAME recovered"
-        clear_event "$SERVICE_NAME-down"
-        send_alert_deduplicated "✅ Service $SERVICE_NAME recovered on $(hostname)"
-    fi
+    log_notice "Service $SERVICE_NAME is running"
+    sa_register_recovery "service_down" "$SERVICE_NAME" "Service $SERVICE_NAME recovered"
 fi
+
+# Call periodically to process grace period expirations
+sa_check_pending_alerts
 ```
 
 ## Requirements
 
 - **Bash 4.0+** - All libraries require Bash 4.0 or higher
-- **curl** - Required for Telegram alerts (alerts.sh)
+- **curl** - Required for webhook alerts (alerts.sh)
 - **jq** - Required for JSON state files (smart-alerts.sh)
 - **Standard Unix utilities** - coreutils (date, mkdir, mv)
 - **State directories**: `/var/lib/alerts/`, `/var/lib/smart-alerts/` (created automatically)
 
 ## Best Practices
 
-1. **Always use rate limiting** - Prevent alert fatigue via `send_alert_deduplicated()`
+1. **Use UPPER_SNAKE_CASE alert types** - Enables severity auto-derivation (`BACKUP_FAILED`, `SERVICE_DOWN`)
 2. **Use grace periods for transient issues** - Don't alert on temporary network blips
 3. **Send recovery alerts** - Inform when issues resolve automatically
-4. **Choose appropriate intervals** - 3h for critical alerts, 24h for warnings
-5. **Use descriptive event IDs** - `service-name-issue-type` (e.g., `nginx-down`)
+4. **Choose appropriate rate limits** - 5-30 min for critical, 1-4h for warnings
+5. **Use descriptive alert types** - `SERVICE_NAME_ISSUE` pattern (e.g., `NGINX_DOWN`)
 
 ## See Also
 

@@ -1,6 +1,7 @@
-# Smart Alerts Library (v1.1.0)
+# Smart Alerts Library (v2.0.0)
 
 Advanced event tracking with grace periods and intelligent recovery detection. Prevents alert fatigue from transient issues.
+Uses `send_alert()` from alerts.sh v2.0.0 (webhook-generic, no Telegram dependency).
 
 ## Quick Start
 
@@ -11,8 +12,7 @@ set -uo pipefail
 source /path/to/monitoring/alerts.sh
 source /path/to/monitoring/smart-alerts.sh
 
-export TELEGRAM_BOT_TOKEN="123456:ABC-xyz"
-export TELEGRAM_CHAT_ID="-1001234567890"
+export ALERT_WEBHOOK_URL="https://mattermost.example.com/hooks/TOKEN"
 
 # Initialize state directories
 sa_init

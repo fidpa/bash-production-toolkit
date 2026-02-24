@@ -1,4 +1,4 @@
-# Secure File Utilities (v1.6.1)
+# Secure File Utilities (v1.0.0)
 
 Atomic file operations library preventing race conditions, partial writes, and security issues.
 

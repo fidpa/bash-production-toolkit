@@ -13,19 +13,19 @@ This document describes the design patterns, dependencies, and conventions used 
          ▼                    ▼                    ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │  smart-alerts   │  │ error-handling  │  │ device-detection│
-│    (v1.1.0)     │  │    (v2.0.0)     │  │    (v1.2.0)     │
+│    (v2.0.0)     │  │    (v1.0.1)     │  │    (v1.0.0)     │
 └────────┬────────┘  └────────┬────────┘  └─────────────────┘
          │                    │
          ▼                    ▼
 ┌─────────────────┐  ┌─────────────────┐
 │     alerts      │  │    logging      │◄─────────────────────┐
-│    (v1.1.0)     │  │    (v2.8.1)     │                      │
+│    (v2.0.0)     │  │    (v2.0.0)     │                      │
 └────────┬────────┘  └────────┬────────┘                      │
          │                    │                               │
          ▼                    ▼                               │
 ┌─────────────────────────────────────────┐          ┌────────┴────────┐
-│         secure-file-utils (v1.6.1)      │          │ path-calculator │
-│              (FOUNDATION)               │          │    (v1.1)       │
+│         secure-file-utils (v1.0.0)      │          │ path-calculator │
+│              (FOUNDATION)               │          │    (v1.0.0)     │
 └─────────────────────────────────────────┘          └─────────────────┘
 ```
 
@@ -188,7 +188,7 @@ All libraries assume these are available:
 | Tool | Used By | Purpose |
 |------|---------|---------|
 | `jq` | smart-alerts.sh, logging.sh | JSON processing |
-| `curl` | alerts.sh | HTTP requests (Telegram API) |
+| `curl` | alerts.sh | HTTP requests (webhook delivery) |
 | `yq` | device-detection.sh | YAML parsing |
 | `systemd-cat` | logging.sh | journald integration |
 | `logger` | logging.sh, simple-logging.sh | syslog integration |
@@ -231,7 +231,7 @@ Note: Include guards make the order less critical, but sourcing in dependency or
 | Library | Prefix | Example |
 |---------|--------|---------|
 | secure-file-utils.sh | `sfu_` | `sfu_write_file` |
-| alerts.sh | `send_` | `send_telegram_alert` |
+| alerts.sh | `send_` | `send_alert` |
 | smart-alerts.sh | `sa_` | `sa_register_event` |
 | path-calculator.sh | `pc_` (internal) | `calculate_relative_path` |
 | device-detection.sh | (none) | `detect_device` |
@@ -242,9 +242,9 @@ Note: Include guards make the order less critical, but sourcing in dependency or
 Internal functions use underscore prefix:
 
 ```bash
-_sfu_error()           # Internal to secure-file-utils.sh
-_send_telegram_message()  # Internal to alerts.sh
-_detect_by_ip()        # Internal to device-detection.sh
+_sfu_error()              # Internal to secure-file-utils.sh
+_send_webhook_message()   # Internal to alerts.sh
+_detect_by_ip()           # Internal to device-detection.sh
 ```
 
 ## Testing

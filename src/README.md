@@ -35,7 +35,7 @@ Located in `src/monitoring/`:
 
 | Library | Purpose | Key Functions |
 |---------|---------|---------------|
-| [alerts.sh](../docs/monitoring/ALERTS.md) | Telegram alerts with rate limiting and deduplication | `send_telegram_alert()`, `send_alert_deduplicated()` |
+| [alerts.sh](../docs/monitoring/ALERTS.md) | Generic webhook alerts with rate limiting (Mattermost/Slack/Discord) | `send_alert()`, `send_recovery_alert()` |
 | [smart-alerts.sh](../docs/monitoring/SMART_ALERTS.md) | Event tracking with grace periods and recovery | `track_event()`, `is_in_grace_period()` |
 
 ### Utility Libraries
@@ -44,8 +44,8 @@ Located in `src/utilities/`:
 
 | Library | Purpose | Key Functions |
 |---------|---------|---------------|
-| [backup-safety.sh](../docs/utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks | `validate_backup_target()`, `is_mountpoint()` |
-| [device-detection.sh](../docs/utilities/DEVICE_DETECTION.md) | Multi-device identification and routing | `detect_device()`, `get_device_repo_root()` |
+| [backup-safety.sh](../docs/utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks | `check_backup_target()`, `check_mountpoint()` |
+| [device-detection.sh](../docs/utilities/DEVICE_DETECTION.md) | Multi-device identification and routing | `detect_device()`, `on_device()` |
 | [path-calculator.sh](../docs/utilities/PATH_CALCULATOR.md) | Relative path calculation for documentation tools | `calculate_relative_path()` |
 
 ## Usage
@@ -91,7 +91,7 @@ source "${BASH_TOOLKIT_LIB}/monitoring/alerts.sh"
 - **Bash 4.0+** - All libraries require Bash 4.0 or higher
 - **Standard Unix utilities** - coreutils (mkdir, chmod, mv, date)
 - **Optional**: `jq` (for JSON features in logging and smart-alerts)
-- **Optional**: `curl` (for Telegram alerts)
+- **Optional**: `curl` (for webhook alerts)
 - **Optional**: `systemd-cat`, `logger` (for journald integration)
 
 ## See Also

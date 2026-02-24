@@ -1,4 +1,4 @@
-# Path Calculator Library (v1.1)
+# Path Calculator Library (v1.0.0)
 
 Utilities for relative path calculation, path validation, and markdown-aware path operations. Useful for documentation tools, link validators, and build systems.
 

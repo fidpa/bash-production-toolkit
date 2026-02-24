@@ -6,7 +6,8 @@
 ![Maintained](https://img.shields.io/badge/Maintained-yes-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Bash 4.0+](https://img.shields.io/badge/Bash-4.0%2B-blue?logo=gnu-bash)
-![Libraries](https://img.shields.io/badge/Libraries-8-orange)
+![Libraries](https://img.shields.io/badge/Libraries-9-orange)
+![Last Commit](https://img.shields.io/github/last-commit/fidpa/bash-production-toolkit)
 
 Production-ready Bash libraries for logging, file operations, error handling, alerting, and system detection.
 
@@ -15,7 +16,7 @@ Production-ready Bash libraries for logging, file operations, error handling, al
 - **Structured Logging** - journald integration, JSON output, log rotation
 - **Atomic File Operations** - Race-condition prevention, secure temp files
 - **Domain Error Handlers** - Docker, network, systemd error recovery
-- **Alert System** - Telegram alerts with rate limiting and deduplication
+- **Alert System** - Generic webhook alerts (Mattermost/Slack/Discord) with rate limiting
 - **Device Detection** - Multi-device support with architecture detection
 - **Path Utilities** - Relative path calculation, markdown-aware operations
 
@@ -32,7 +33,7 @@ source /path/to/bash-production-toolkit/src/foundation/secure-file-utils.sh
 # Use them
 log_info "Application started"
 sfu_write_file "config data" "/var/lib/myapp/config.txt"
-log_success "Configuration saved"
+log_notice "Configuration saved"
 ```
 
 ## Installation
@@ -63,7 +64,7 @@ source "${TOOLKIT}/foundation/logging.sh"
 
 | Library | Purpose |
 |---------|---------|
-| [alerts.sh](docs/monitoring/ALERTS.md) | Telegram alerts with rate limiting |
+| [alerts.sh](docs/monitoring/ALERTS.md) | Generic webhook alerts with rate limiting (Mattermost/Slack/Discord) |
 | [smart-alerts.sh](docs/monitoring/SMART_ALERTS.md) | Event tracking with grace periods |
 
 ### Utilities
@@ -78,7 +79,7 @@ source "${TOOLKIT}/foundation/logging.sh"
 
 - Bash 4.0+
 - Standard Unix utilities (coreutils)
-- Optional: `jq` (for JSON features), `curl` (for Telegram alerts)
+- Optional: `jq` (for JSON features), `curl` (for webhook alerts)
 
 ## Documentation
 
@@ -91,7 +92,7 @@ Full documentation is available in the [docs/](docs/) directory:
 
 ### Library Documentation
 - [Foundation Libraries](docs/foundation/) - Logging, file operations, error handling
-- [Monitoring Libraries](docs/monitoring/) - Telegram alerts, smart alerts
+- [Monitoring Libraries](docs/monitoring/) - Webhook alerts, smart alerts
 - [Utility Libraries](docs/utilities/) - Device detection, path utilities
 
 ## Examples
@@ -101,7 +102,7 @@ See the [examples/](examples/) directory for ready-to-run scripts:
 ```bash
 ./examples/01-logging-basics.sh
 ./examples/02-file-operations.sh
-./examples/03-telegram-alerts.sh
+./examples/03-webhook-alerts.sh
 ```
 
 ## Contributing

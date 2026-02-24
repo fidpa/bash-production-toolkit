@@ -7,8 +7,7 @@
 # Demonstrates combining multiple libraries for production monitoring
 #
 # Prerequisites:
-#   export TELEGRAM_BOT_TOKEN="your-bot-token"
-#   export TELEGRAM_CHAT_ID="your-chat-id"
+#   export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
 #
 # Usage:
 #   ./06-monitoring-script.sh
@@ -26,7 +25,7 @@ source "${TOOLKIT}/utilities/device-detection.sh"
 
 # Configuration
 export LOG_LEVEL=INFO
-export TELEGRAM_PREFIX="[Monitor]"
+export ALERTS_PREFIX="[Monitor]"
 STATE_FILE="${STATE_DIR:-/tmp}/.monitor-demo.state"
 
 # Thresholds
@@ -45,10 +44,10 @@ check_disk() {
     log_info "Disk usage: ${usage}%"
 
     if [[ $usage -ge $DISK_CRIT ]]; then
-        send_telegram_alert "disk_critical" "Disk usage critical: ${usage}%" "🔴"
+        send_alert "DISK_CRITICAL" "Disk usage critical: ${usage}%"
         return 1
     elif [[ $usage -ge $DISK_WARN ]]; then
-        send_telegram_alert "disk_warning" "Disk usage high: ${usage}%" "⚠️"
+        send_alert "DISK_HIGH" "Disk usage high: ${usage}%"
         return 0
     fi
 
@@ -64,7 +63,7 @@ check_memory() {
     log_info "Memory usage: ${usage}%"
 
     if [[ $usage -ge 90 ]]; then
-        send_telegram_alert "memory_critical" "Memory usage critical: ${usage}%" "🔴"
+        send_alert "MEMORY_CRITICAL" "Memory usage critical: ${usage}%"
         return 1
     fi
 
@@ -82,7 +81,7 @@ check_load() {
 
     # Alert if load > 2x CPUs
     if (( $(echo "$load > $cpus * 2" | bc -l) )); then
-        send_telegram_alert "load_high" "Load average high: $load" "⚠️"
+        send_alert "LOAD_HIGH" "Load average high: $load (CPUs: $cpus)"
         return 1
     fi
 

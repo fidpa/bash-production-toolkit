@@ -4,8 +4,17 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Advanced Logging Library
-# Version: 1.2.0 (Updated: 17.01.2026 - Bug fixes + log_json fields support)
-# Changelog v1.2.0 (17.01.2026): Bug fixes and feature enhancement
+# Version: 2.0.0 (Updated: 24.02.2026)
+# Changelog v2.0.0 (24.02.2026): 6-Level Log System (RFC 5424 aligned)
+#   - NEW: LOG_LEVEL_NOTICE=2 - Between INFO and WARN (syslog-compatible)
+#   - NEW: log_notice() wrapper and notice() alias
+#   - NEW: log_notice_structured() - Structured logging for NOTICE level
+#   - NEW: detect_environment() - prod/dev/test auto-detection
+#   - CHANGED: Level values shifted: WARN=3, ERROR=4, CRITICAL=5 (was 2/3/4)
+#   - CHANGED: log_success() now deprecated alias for log_notice()
+#   - IMPROVED: journald priority mapping includes NOTICE (<5>=SD_NOTICE)
+#   - IMPROVED: Metrics tracking includes notice_count
+# Changelog v1.2.0 (17.01.2026): Bug fixes + log_json fields support
 #   - FIX: check_log_rotation() now uses LOG_DIR instead of undefined DEFAULT_LOG_DIR
 #   - FEATURE: log_json() now supports additional fields (key=value pairs)
 #   - DOCS: Removed unimplemented "Prometheus metrics export" claim
@@ -15,7 +24,6 @@
 #   - NEW: log_debug_structured(), log_warn_structured(), log_critical_structured()
 #   - NEW: extract_script_version() - Auto-extract version from script headers
 #   - NEW: check_log_rotation() - Manual size-based log rotation
-#   - TOTAL: +6 functions, +74 lines, 100% generic (no internal dependencies)
 # Changelog v1.0.1 (01.01.2026): Documentation + dependency improvements
 # Changelog v1.0.0 (01.01.2026): Initial public release
 #
@@ -24,19 +32,20 @@
 #   performance metrics, and log rotation for systemd-based Linux systems.
 #
 # Features:
-#   - Multiple log levels (DEBUG, INFO, WARN, ERROR, CRITICAL)
+#   - 6 log levels: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL (RFC 5424 aligned)
 #   - Structured logging with KEY=VALUE fields
 #   - journald integration (systemd-cat, logger)
 #   - JSON output format
 #   - Performance metrics tracking
 #   - Log rotation (manual via check_log_rotation)
 #   - Correlation IDs for distributed tracing
+#   - Environment auto-detection (prod/dev/test)
 #
 # Usage:
 #   source "/path/to/logging.sh"
 #   log_info "Starting operation"
+#   log_notice "Service started successfully"
 #   log_error "Failed to connect"
-#   log_info_structured "Event" "KEY1=value1" "KEY2=value2"
 #
 # Dependencies:
 #   - Bash 4.0+
@@ -53,9 +62,6 @@
 #   LOG_DIR          - Log directory (default: /var/log)
 #   LOG_ROTATE_SIZE  - Rotation size (default: 10M)
 #   LOG_ROTATE_COUNT - Keep N rotated logs (default: 5)
-#
-# Changelog:
-#   v1.0.0 (2026-01-01): Initial public release
 
 # Include guard
 if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
@@ -84,12 +90,13 @@ fi
 # CONFIGURATION
 # ============================================================================
 
-# Log levels
+# Log levels (RFC 5424 aligned: 6 levels)
 readonly LOG_LEVEL_DEBUG=0
 readonly LOG_LEVEL_INFO=1
-readonly LOG_LEVEL_WARN=2
-readonly LOG_LEVEL_ERROR=3
-readonly LOG_LEVEL_CRITICAL=4
+readonly LOG_LEVEL_NOTICE=2
+readonly LOG_LEVEL_WARN=3
+readonly LOG_LEVEL_ERROR=4
+readonly LOG_LEVEL_CRITICAL=5
 
 # Defaults
 : "${LOG_LEVEL:=INFO}"
@@ -104,12 +111,13 @@ readonly LOG_LEVEL_CRITICAL=4
 get_log_level_value() {
     local level="${1^^}"
     case "$level" in
-        DEBUG) echo $LOG_LEVEL_DEBUG ;;
-        INFO) echo $LOG_LEVEL_INFO ;;
-        WARN|WARNING) echo $LOG_LEVEL_WARN ;;
-        ERROR) echo $LOG_LEVEL_ERROR ;;
-        CRITICAL|CRIT) echo $LOG_LEVEL_CRITICAL ;;
-        *) echo $LOG_LEVEL_INFO ;;
+        DEBUG)             echo "$LOG_LEVEL_DEBUG" ;;
+        INFO)              echo "$LOG_LEVEL_INFO" ;;
+        NOTICE|SUCCESS)    echo "$LOG_LEVEL_NOTICE" ;;
+        WARN|WARNING)      echo "$LOG_LEVEL_WARN" ;;
+        ERROR)             echo "$LOG_LEVEL_ERROR" ;;
+        CRITICAL|CRIT)     echo "$LOG_LEVEL_CRITICAL" ;;
+        *)                 echo "$LOG_LEVEL_INFO" ;;
     esac
 }
 
@@ -123,7 +131,45 @@ declare -gA SCRIPT_METRICS=(
     [log_count]=0
     [error_count]=0
     [warning_count]=0
+    [notice_count]=0
 )
+
+# ============================================================================
+# ENVIRONMENT DETECTION
+# ============================================================================
+
+# Auto-detect execution environment: prod, dev, or test
+# Uses hostname patterns and environment variables as signals
+detect_environment() {
+    # Explicit override takes priority
+    if [[ -n "${APP_ENV:-}" ]]; then
+        echo "$APP_ENV"
+        return 0
+    fi
+
+    # CI/CD environments
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
+        echo "test"
+        return 0
+    fi
+
+    # Hostname patterns (common conventions)
+    local hostname_short
+    hostname_short=$(hostname -s 2>/dev/null || echo "unknown")
+
+    case "$hostname_short" in
+        *dev*|*local*)
+            echo "dev" ;;
+        *test*|*staging*|*qa*)
+            echo "test" ;;
+        *)
+            echo "prod" ;;
+    esac
+}
+
+# shellcheck disable=SC2155
+SCRIPT_ENV="$(detect_environment)"
+readonly SCRIPT_ENV
 
 # ============================================================================
 # CORRELATION ID
@@ -166,7 +212,9 @@ json_escape() {
     str="${str//$'\n'/\\n}"
     str="${str//$'\r'/\\r}"
     str="${str//$'\t'/\\t}"
-    echo "$str"
+    str="${str//$'\b'/\\b}"
+    str="${str//$'\f'/\\f}"
+    printf '%s' "$str"
 }
 
 # ============================================================================
@@ -178,9 +226,11 @@ log_to_journald_modern() {
     local message="$2"
     local priority_prefix
 
+    # RFC 5424 / SD priorities
     case "$level" in
         DEBUG)    priority_prefix="<7>" ;;
         INFO)     priority_prefix="<6>" ;;
+        NOTICE)   priority_prefix="<5>" ;;
         WARN)     priority_prefix="<4>" ;;
         ERROR)    priority_prefix="<3>" ;;
         CRITICAL) priority_prefix="<2>" ;;
@@ -205,6 +255,7 @@ log_to_journald_structured() {
     case "$level" in
         DEBUG)    priority="debug" ;;
         INFO)     priority="info" ;;
+        NOTICE)   priority="notice" ;;
         WARN)     priority="warning" ;;
         ERROR)    priority="err" ;;
         CRITICAL) priority="crit" ;;
@@ -241,6 +292,7 @@ log_to_journald_legacy() {
     case "$level" in
         DEBUG)    priority="debug" ;;
         INFO)     priority="info" ;;
+        NOTICE)   priority="notice" ;;
         WARN)     priority="warning" ;;
         ERROR)    priority="err" ;;
         CRITICAL) priority="crit" ;;
@@ -315,20 +367,20 @@ log_json() {
     escaped_message=$(json_escape "$message")
 
     # Parse additional fields (key=value pairs)
-    local fields=""
+    local extra_fields=""
     while [[ $# -gt 0 ]]; do
         if [[ "$1" == *"="* ]]; then
             local key="${1%%=*}"
             local value="${1#*=}"
             local escaped_value
             escaped_value=$(json_escape "$value")
-            fields="${fields},\"${key}\":\"${escaped_value}\""
+            extra_fields="${extra_fields},\"${key}\":\"${escaped_value}\""
         fi
         shift
     done
 
     local json_log
-    json_log="{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"message\":\"$escaped_message\",\"hostname\":\"$hostname\",\"script\":\"${SCRIPT_NAME:-unknown}\",\"pid\":$$${fields}}"
+    json_log="{\"timestamp\":\"$timestamp\",\"level\":\"$level\",\"message\":\"$escaped_message\",\"hostname\":\"$hostname\",\"script\":\"${SCRIPT_NAME:-unknown}\",\"env\":\"${SCRIPT_ENV}\",\"pid\":$$${extra_fields}}"
 
     if [[ "${LOG_TO_STDOUT:-true}" == "true" ]]; then
         echo "$json_log"
@@ -358,7 +410,8 @@ log_structured() {
     ((SCRIPT_METRICS[log_count]++)) || true
     case "$level" in
         ERROR|CRITICAL) ((SCRIPT_METRICS[error_count]++)) || true ;;
-        WARN|WARNING) ((SCRIPT_METRICS[warning_count]++)) || true ;;
+        WARN|WARNING)   ((SCRIPT_METRICS[warning_count]++)) || true ;;
+        NOTICE)         ((SCRIPT_METRICS[notice_count]++)) || true ;;
     esac
 
     local context=""
@@ -367,6 +420,8 @@ log_structured() {
         shift
     done
 
+    # context is intentionally word-split here (space-separated KEY=VALUE pairs)
+    # shellcheck disable=SC2086
     case "$LOG_FORMAT" in
         json)   log_json "$level" "$message" $context ;;
         compact)
@@ -400,6 +455,31 @@ log_info_structured() {
         local timestamp
         timestamp=$(date '+%H:%M:%S')
         echo "[$timestamp] [INFO] $message [${fields[*]}]"
+    fi
+}
+
+log_notice_structured() {
+    local message="$1"
+    shift
+    local fields=("$@")
+
+    if [[ $LOG_LEVEL_NOTICE -lt $CURRENT_LOG_LEVEL ]]; then
+        return 0
+    fi
+
+    ((SCRIPT_METRICS[log_count]++)) || true
+    ((SCRIPT_METRICS[notice_count]++)) || true
+
+    if [[ "$LOG_TO_JOURNAL" == "true" ]]; then
+        log_to_journald_structured "NOTICE" "$message" "${fields[@]}"
+    fi
+
+    log_to_file "NOTICE" "$message [${fields[*]}]"
+
+    if [[ "${LOG_TO_STDOUT:-true}" == "true" ]]; then
+        local timestamp
+        timestamp=$(date '+%H:%M:%S')
+        echo "[$timestamp] [NOTICE] $message [${fields[*]}]"
     fi
 }
 
@@ -440,6 +520,7 @@ log_performance() {
     perf_msg="$perf_msg | Logs: ${SCRIPT_METRICS[log_count]}"
     perf_msg="$perf_msg | Errors: ${SCRIPT_METRICS[error_count]}"
     perf_msg="$perf_msg | Warnings: ${SCRIPT_METRICS[warning_count]}"
+    perf_msg="$perf_msg | Notices: ${SCRIPT_METRICS[notice_count]}"
 
     local old_stdout="${LOG_TO_STDOUT}"
     LOG_TO_STDOUT=false
@@ -484,12 +565,49 @@ rotate_log() {
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
-log_debug() { log_structured "DEBUG" "$@"; }
-log_info() { log_structured "INFO" "$@"; }
-log_success() { log_structured "INFO" "$@"; }
-log_warn() { log_structured "WARN" "$@"; }
-log_error() { log_structured "ERROR" "$@"; }
+# ============================================================================
+# MODULE MAP — 6 Log Levels + Structured Variants
+# ============================================================================
+#
+# 1. PRIMARY LEVELS (RFC 5424 aligned)
+#    log_debug()     DEBUG=0    Diagnostic details
+#    log_info()      INFO=1     Normal operations
+#    log_notice()    NOTICE=2   Significant events (service started, task complete)
+#    log_warn()      WARN=3     Warnings, degraded state
+#    log_error()     ERROR=4    Errors, failed operations
+#    log_critical()  CRITICAL=5 Fatal errors, immediate action required
+#
+# 2. STRUCTURED VARIANTS (KEY=VALUE journald fields)
+#    log_info_structured()
+#    log_notice_structured()
+#    log_error_structured()
+#    log_debug_structured()
+#    log_warn_structured()
+#    log_critical_structured()
+#
+# 3. PERFORMANCE
+#    log_performance()    Script duration + metric summary
+#    time_function()      Single function execution time
+#
+# 4. ENVIRONMENT
+#    detect_environment() prod/dev/test auto-detection
+#
+# 5. UTILITY
+#    extract_script_version()  Extract version from script header
+#    check_log_rotation()      Size-based log rotation trigger
+#
+# ============================================================================
+
+log_debug()    { log_structured "DEBUG"    "$@"; }
+log_info()     { log_structured "INFO"     "$@"; }
+log_notice()   { log_structured "NOTICE"   "$@"; }
+log_warn()     { log_structured "WARN"     "$@"; }
+log_error()    { log_structured "ERROR"    "$@"; }
 log_critical() { log_structured "CRITICAL" "$@"; }
+
+# Deprecated: log_success() → use log_notice() instead
+# Will be removed in v3.0.0
+log_success() { log_structured "NOTICE" "$@"; }
 
 # Generic log function
 log() {
@@ -497,7 +615,7 @@ log() {
         return 0
     fi
 
-    if [[ "$1" =~ ^(DEBUG|INFO|WARN|WARNING|ERROR|CRITICAL)$ ]]; then
+    if [[ "$1" =~ ^(DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|CRITICAL)$ ]]; then
         log_structured "$@"
     else
         log_structured "INFO" "$@"
@@ -505,34 +623,35 @@ log() {
 }
 
 # Aliases
-info() { log_info "$@"; }
-warn() { log_warn "$@"; }
-warning() { log_warn "$@"; }
-error() { log_error "$@"; }
-debug() { log_debug "$@"; }
+info()     { log_info     "$@"; }
+notice()   { log_notice   "$@"; }
+warn()     { log_warn     "$@"; }
+warning()  { log_warn     "$@"; }
+error()    { log_error    "$@"; }
+debug()    { log_debug    "$@"; }
 critical() { log_critical "$@"; }
-success() { log_info "✓ $*"; }
-failure() { log_error "✗ $*"; }
+success()  { log_notice   "✓ $*"; }
+failure()  { log_error    "✗ $*"; }
 
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
 
+_logging_exit_handler() {
+    local ret=$?
+    log_performance || true
+    cd "$ORIGINAL_PWD" 2>/dev/null || true
+    exit "$ret"
+}
+
 if [[ "${LOG_PERFORMANCE:-true}" == "true" ]]; then
-    trap 'ret=$?; log_performance || true; cd "$ORIGINAL_PWD" 2>/dev/null || true; exit "$ret"' EXIT
+    trap '_logging_exit_handler' EXIT
 else
     trap 'cd "$ORIGINAL_PWD" 2>/dev/null || true' EXIT
 fi
 
-# Export functions
-
 # ============================================================================
-# ADDITIONAL FUNCTIONS (v1.1.0)
-# ============================================================================
-
-# ============================================================================
-# ADDITIONAL FUNCTIONS FOR bash-production-toolkit v1.1.0
-# Ported from server repo logging.sh v2.9.0
+# ADDITIONAL FUNCTIONS
 # ============================================================================
 
 # Log function execution time
@@ -554,24 +673,15 @@ time_function() {
     return $result
 }
 
-# Structured logging variants (missing in v1.0.0)
-log_debug_structured() {
-    log_structured "DEBUG" "$@"
-}
-
-log_warn_structured() {
-    log_structured "WARN" "$@"
-}
-
-log_critical_structured() {
-    log_structured "CRITICAL" "$@"
-}
+# Structured logging variants
+log_debug_structured()    { log_structured "DEBUG"    "$@"; }
+log_warn_structured()     { log_structured "WARN"     "$@"; }
+log_critical_structured() { log_structured "CRITICAL" "$@"; }
 
 # Extract script version from file header
 extract_script_version() {
     local script_file="${1:-${SCRIPT_PATH}}"
     if [[ -f "$script_file" ]]; then
-        # Search for "Version: X.Y.Z" or "# Version: X.Y.Z" in first 50 lines
         grep -m1 -oP '(?i)(?:^#\s*)?version:\s*\K[\d.]+' "$script_file" 2>/dev/null || echo "unknown"
     else
         echo "unknown"
@@ -605,6 +715,7 @@ check_log_rotation() {
     return 0
 }
 
-export -f log_structured log_json log_debug log_info log_warn log_error log_critical time_function check_log_rotation extract_script_version
-export -f log_with_fallback log_to_file log_debug_structured log_warn_structured log_critical_structured
-export -f log info warn warning error debug critical success failure
+export -f log_structured log_json json_escape log_debug log_info log_notice log_warn log_error log_critical time_function check_log_rotation extract_script_version
+export -f log_with_fallback log_to_file log_debug_structured log_notice_structured log_warn_structured log_error_structured log_critical_structured
+export -f log info notice warn warning error debug critical success failure log_success
+export -f detect_environment

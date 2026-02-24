@@ -2,7 +2,7 @@
 
 ## ⚡ TL;DR
 
-Clone repo → Source libraries → Configure env vars (TELEGRAM_*) → Create state dirs (/var/lib/alerts) → Integrate with systemd. Prerequisites: Bash 4.0+, optional jq/curl.
+Clone repo → Source libraries → Set ALERT_WEBHOOK_URL → Create state dirs (/var/lib/alerts) → Integrate with systemd. Prerequisites: Bash 4.0+, optional jq/curl.
 
 ---
 
@@ -13,7 +13,7 @@ Complete installation and configuration guide for the Bash Production Toolkit.
 - **Bash 4.0+** (check with `bash --version`)
 - **Standard Unix utilities** (coreutils: `mkdir`, `chmod`, `mv`, `date`)
 - **Optional**: `jq` (for JSON logging and smart-alerts)
-- **Optional**: `curl` (for Telegram alerts)
+- **Optional**: `curl` (for webhook alerts)
 - **Optional**: `systemd-cat`, `logger` (for journald integration)
 
 ## Installation
@@ -60,35 +60,37 @@ log_info "Script started"
 sfu_write_file "data" "/var/lib/myapp/state.txt"
 ```
 
-## Telegram Alerts Setup
+## Webhook Alerts Setup
 
-The alerting libraries (`alerts.sh`, `smart-alerts.sh`) require Telegram configuration.
+The alerting libraries (`alerts.sh`, `smart-alerts.sh`) require a webhook URL.
+Compatible with any Slack-compatible webhook: Mattermost, Slack, Discord, or custom endpoints.
 
-### 1. Create a Telegram Bot
+### 1. Get a Webhook URL
 
-1. Open Telegram and search for `@BotFather`
-2. Send `/newbot` and follow the prompts
-3. Save the **API token** (format: `123456789:ABCdef...`)
+**Mattermost**: System Console → Integrations → Incoming Webhooks → Add Incoming Webhook
 
-### 2. Get Your Chat ID
+**Slack**: api.slack.com/apps → Incoming Webhooks → Add New Webhook to Workspace
 
-1. Add your bot to a group or start a chat with it
-2. Send a message to the bot
-3. Visit: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
-4. Find `"chat":{"id":123456789}` in the response
+**Discord**: Server Settings → Integrations → Webhooks → New Webhook
+(Append `/slack` to Discord webhook URLs for Slack-compatible format)
 
-### 3. Configure Environment
+### 2. Configure Environment
 
 ```bash
-export TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-export TELEGRAM_CHAT_ID="-1001234567890"
+export ALERT_WEBHOOK_URL="https://your-service/hooks/TOKEN"
 ```
 
-### 4. Test Alert
+Optional settings:
+```bash
+export ALERTS_PREFIX="[MyServer]"          # Message prefix (default: [System])
+export ALERT_WEBHOOK_CACERT="/path/to/ca.crt"  # For self-signed TLS
+```
+
+### 3. Test Alert
 
 ```bash
 source "${TOOLKIT}/monitoring/alerts.sh"
-send_telegram_alert "test" "Hello from bash-production-toolkit!" "🧪"
+send_alert "SYSTEM_TEST" "Hello from bash-production-toolkit!" "🧪"
 ```
 
 ## Configuration Options
@@ -97,7 +99,7 @@ send_telegram_alert "test" "Hello from bash-production-toolkit!" "🧪"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, WARN, ERROR, CRITICAL |
+| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL |
 | `LOG_FORMAT` | `standard` | Output format: standard, json, compact |
 | `LOG_TO_JOURNAL` | `false` | Enable journald integration |
 | `LOG_TO_STDOUT` | `true` | Output to terminal |
@@ -110,9 +112,9 @@ send_telegram_alert "test" "Hello from bash-production-toolkit!" "🧪"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | (required) | Telegram Bot API token |
-| `TELEGRAM_CHAT_ID` | (required) | Target chat/group ID |
-| `TELEGRAM_PREFIX` | `[System]` | Message prefix |
+| `ALERT_WEBHOOK_URL` | (required) | Slack-compatible webhook endpoint URL |
+| `ALERT_WEBHOOK_CACERT` | `<not set>` | CA cert path for self-signed TLS |
+| `ALERTS_PREFIX` | `[System]` | Message prefix |
 | `RATE_LIMIT_SECONDS` | `1800` | Cooldown between same alerts |
 | `STATE_DIR` | `/var/lib/alerts` | State file directory |
 | `ENABLE_RECOVERY_ALERTS` | `true` | Send recovery notifications |
@@ -197,10 +199,9 @@ TOOLKIT="/usr/local/lib/bash-production-toolkit"
 LOG_LEVEL=INFO
 LOG_TO_JOURNAL=true
 
-# Alerting
-TELEGRAM_BOT_TOKEN="your-token"
-TELEGRAM_CHAT_ID="your-chat-id"
-TELEGRAM_PREFIX="[MyServer]"
+# Alerting (webhook-generic: works with Mattermost, Slack, Discord, etc.)
+ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
+ALERTS_PREFIX="[MyServer]"
 RATE_LIMIT_SECONDS=1800
 
 # State directories
@@ -221,8 +222,7 @@ source "${TOOLKIT}/monitoring/alerts.sh"
 ```bash
 # /etc/cron.d/my-monitor
 TOOLKIT=/usr/local/lib/bash-production-toolkit
-TELEGRAM_BOT_TOKEN=your-token
-TELEGRAM_CHAT_ID=your-chat-id
+ALERT_WEBHOOK_URL=https://your-webhook-endpoint/TOKEN
 STATE_DIR=/var/lib/alerts
 
 */5 * * * * root /usr/local/bin/my-monitor.sh 2>&1 | logger -t my-monitor
@@ -260,5 +260,5 @@ echo "=== All tests passed ==="
 
 - [Architecture Overview](ARCHITECTURE.md) - Library dependencies
 - [Foundation Libraries](foundation/) - Logging, file operations
-- [Monitoring Libraries](monitoring/) - Telegram alerting
+- [Monitoring Libraries](monitoring/) - Webhook alerting
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues

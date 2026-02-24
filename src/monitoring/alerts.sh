@@ -4,41 +4,62 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Alerts Library
-# Version: 1.0.1 (Updated: 17.01.2026 - Bug fix)
+# Version: 2.0.0 (Updated: 24.02.2026)
+# Changelog v2.0.0 (24.02.2026): Webhook-Generic Backend (Breaking Change)
+#   - BREAKING: Removed Telegram delivery (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+#   - BREAKING: Removed send_telegram_alert() - use send_alert() instead
+#   - BREAKING: Renamed TELEGRAM_PREFIX → ALERTS_PREFIX
+#   - NEW: send_alert() - Generic webhook delivery (Mattermost/Slack/Discord)
+#   - NEW: _derive_severity() - Auto-derive severity from alert_type name pattern
+#   - NEW: ALERT_WEBHOOK_URL - Required environment variable for webhook endpoint
+#   - NEW: ALERT_WEBHOOK_CACERT - Optional path to CA cert for self-signed TLS
+#   - IMPROVED: Rate limiting via .last_alert_TYPE files (unchanged from v1.x)
+#   - IMPROVED: Severity auto-derived: *_FAILED→error, *_RECOVERED→notice, etc.
+#   - KEPT: send_recovery_alert(), clear_rate_limit() (updated to use send_alert)
 # Changelog v1.0.1 (17.01.2026): send_recovery_alert default message
 #   - FIX: send_recovery_alert() now has default message "Recovered" (matches docs)
-# Changelog v1.0.0 (01.01.2026): Initial public release
+# Changelog v1.0.0 (01.01.2026): Initial public release (Telegram-based)
 #
 # Purpose:
-#   Telegram alerting with rate limiting and smart deduplication
-#   to reduce alert fatigue.
+#   Generic webhook alerting with rate limiting and smart deduplication
+#   to reduce alert fatigue. Works with any Slack-compatible webhook
+#   (Mattermost, Slack, Discord, custom endpoints).
 #
 # Features:
-#   - Rate-limited Telegram alerts (configurable cooldown)
-#   - Smart deduplication (only alert on state changes)
+#   - Rate-limited alerts (configurable cooldown per alert type)
+#   - Severity auto-derivation from alert type name patterns
+#   - Generic JSON webhook delivery (vendor-agnostic)
 #   - Recovery alerts (service restored notifications)
 #   - Content hashing for duplicate detection
 #
 # Usage:
 #   source "/path/to/alerts.sh"
-#   send_telegram_alert "disk_full" "Disk usage at 95%"
-#   send_smart_alert "service_down" "nginx" "Service nginx is down"
+#   export ALERT_WEBHOOK_URL="https://mattermost.example/hooks/xxx"
+#
+#   send_alert "BACKUP_FAILED" "Backup job failed at 03:00"
+#   # → severity auto-derived as "error", emoji "🟠"
+#
+#   send_alert "SERVICE_RECOVERED" "nginx is back online"
+#   # → severity auto-derived as "notice", emoji "🔵"
+#
+# Supported webhook formats (Slack-compatible JSON):
+#   - Mattermost: https://your-mm/hooks/TOKEN
+#   - Slack:      https://hooks.slack.com/services/T/B/TOKEN
+#   - Discord:    https://discord.com/api/webhooks/ID/TOKEN
+#   - Custom:     Any endpoint accepting {"text": "..."}
 #
 # Dependencies:
 #   - logging.sh (optional, falls back to echo)
 #   - secure-file-utils.sh (optional, for atomic writes)
-#   - curl (for Telegram API)
+#   - curl (required for webhook delivery)
 #
 # Configuration (environment variables):
-#   TELEGRAM_BOT_TOKEN   - Telegram bot token (required)
-#   TELEGRAM_CHAT_ID     - Telegram chat ID (required)
-#   TELEGRAM_PREFIX      - Message prefix (default: [System])
-#   RATE_LIMIT_SECONDS   - Cooldown between same alerts (default: 1800)
-#   STATE_DIR            - Directory for state files (default: /var/lib/alerts)
-#   ENABLE_RECOVERY_ALERTS - Send recovery notifications (default: true)
-#
-# Changelog:
-#   v1.0.0 (2026-01-01): Initial public release
+#   ALERT_WEBHOOK_URL        - Webhook endpoint URL (required)
+#   ALERT_WEBHOOK_CACERT     - Path to CA cert for self-signed TLS (optional)
+#   ALERTS_PREFIX            - Message prefix (default: [System])
+#   RATE_LIMIT_SECONDS       - Cooldown between same alerts (default: 1800)
+#   STATE_DIR                - Directory for state files (default: /var/lib/alerts)
+#   ENABLE_RECOVERY_ALERTS   - Send recovery notifications (default: true)
 
 # ============================================================================
 # INCLUDE GUARD
@@ -61,10 +82,10 @@ fi
 
 # Fallback logging if not available
 if ! declare -F log_info >/dev/null 2>&1; then
-    log_info() { echo "[INFO] $*"; }
+    log_info()  { echo "[INFO] $*"; }
     log_error() { echo "[ERROR] $*" >&2; }
     log_debug() { [[ "${DEBUG:-false}" == "true" ]] && echo "[DEBUG] $*"; }
-    log_warn() { echo "[WARN] $*" >&2; }
+    log_warn()  { echo "[WARN] $*" >&2; }
 fi
 
 # Try to load secure-file-utils.sh
@@ -77,7 +98,7 @@ fi
 # CONFIGURATION
 # ============================================================================
 
-: "${TELEGRAM_PREFIX:=[System]}"
+: "${ALERTS_PREFIX:=[System]}"
 : "${RATE_LIMIT_SECONDS:=1800}"
 : "${STATE_DIR:=/var/lib/alerts}"
 : "${ENABLE_RECOVERY_ALERTS:=true}"
@@ -100,56 +121,55 @@ _alerts_write_file() {
     fi
 }
 
-_alerts_count_lines() {
-    local file="$1"
-    [[ -f "$file" ]] && wc -l < "$file" || echo 0
-}
-
 _alerts_get_hash() {
     echo -n "$1" | md5sum | cut -d' ' -f1
 }
 
-# ============================================================================
-# TELEGRAM API
-# ============================================================================
+# Sanitize identifier for use in file paths (prevent directory traversal)
+# Only allows: a-z, A-Z, 0-9, underscore, hyphen, dot
+_sanitize_alert_id() {
+    local input="$1"
+    printf '%s' "${input//[^a-zA-Z0-9_.-]/}"
+}
 
-_send_telegram_message() {
-    local message="$1"
-
-    if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] || [[ -z "${TELEGRAM_CHAT_ID:-}" ]]; then
-        log_error "Telegram credentials not configured"
-        return 1
-    fi
-
-    local response
-    response=$(curl -s -X POST \
-        "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-        -d "chat_id=${TELEGRAM_CHAT_ID}" \
-        -d "text=${message}" \
-        -d "parse_mode=HTML" \
-        2>/dev/null)
-
-    if echo "$response" | grep -q '"ok":true'; then
-        return 0
-    else
-        log_error "Telegram API error: $response"
-        return 1
-    fi
+# ─────────────────────────────────────────────────────────────────────────────
+# _derive_severity <alert_type>
+# Derive severity from alert_type name pattern (RFC-aligned)
+# Returns: "critical", "error", "warning", "notice", or "info"
+# ─────────────────────────────────────────────────────────────────────────────
+_derive_severity() {
+    local alert_type="$1"
+    case "$alert_type" in
+        *_CRITICAL|*_DOWN)
+            echo "critical" ;;
+        *_ERROR|*_FAILURE|*_FAILED)
+            echo "error" ;;
+        *_WARNING|*_DEGRADED|*_HIGH|*_THROTTLED)
+            echo "warning" ;;
+        *_RECOVERED|*_RESOLVED|*_SUCCESS|*_COMPLETE|*_BOOT)
+            echo "notice" ;;
+        *_NEW|*)
+            echo "info" ;;
+    esac
 }
 
 # ============================================================================
 # RATE LIMITING
 # ============================================================================
 
-_check_rate_limit() {
+# Atomically check and update rate limit (prevents TOCTOU race condition)
+# Returns 0 if alert is allowed, 1 if rate-limited
+_check_and_update_rate_limit() {
     local alert_type="$1"
-    local rate_file="${STATE_DIR}/.rate_limit_${alert_type}"
+    local safe_type
+    safe_type=$(_sanitize_alert_id "$alert_type")
+    local rate_file="${STATE_DIR}/.last_alert_${safe_type}"
+    local now
+    now=$(date +%s)
 
     if [[ -f "$rate_file" ]]; then
         local last_sent
         last_sent=$(cat "$rate_file" 2>/dev/null || echo 0)
-        local now
-        now=$(date +%s)
         local elapsed=$((now - last_sent))
 
         if [[ $elapsed -lt $RATE_LIMIT_SECONDS ]]; then
@@ -159,42 +179,121 @@ _check_rate_limit() {
         fi
     fi
 
+    # Update timestamp atomically before sending (minimizes race window)
+    _alerts_write_file "$now" "$rate_file"
     return 0
 }
 
-_update_rate_limit() {
-    local alert_type="$1"
-    local rate_file="${STATE_DIR}/.rate_limit_${alert_type}"
+# ============================================================================
+# WEBHOOK DELIVERY
+# ============================================================================
 
-    _alerts_write_file "$(date +%s)" "$rate_file"
+# Internal: send JSON payload to webhook URL
+# Usage: _send_webhook_message "text content"
+_send_webhook_message() {
+    local text="$1"
+
+    if [[ -z "${ALERT_WEBHOOK_URL:-}" ]]; then
+        log_error "ALERT_WEBHOOK_URL not configured - cannot send alert"
+        return 1
+    fi
+
+    # Build JSON payload (prefer jq for RFC 8259 compliance)
+    local json_payload
+    if command -v jq &>/dev/null; then
+        json_payload=$(jq -n --arg text "$text" '{"text": $text}')
+    else
+        # Bash fallback: escape known special characters
+        local escaped="${text//\\/\\\\}"
+        escaped="${escaped//\"/\\\"}"
+        escaped="${escaped//$'\n'/\\n}"
+        escaped="${escaped//$'\r'/\\r}"
+        escaped="${escaped//$'\t'/\\t}"
+        escaped="${escaped//$'\b'/\\b}"
+        escaped="${escaped//$'\f'/\\f}"
+        json_payload=$(printf '{"text": "%s"}' "$escaped")
+    fi
+
+    local curl_args=(
+        -s -X POST
+        -H "Content-Type: application/json"
+        -d "$json_payload"
+        --max-time 10
+        --retry 3
+        --retry-delay 2
+        "$ALERT_WEBHOOK_URL"
+    )
+
+    # Optional CA cert for self-signed TLS
+    if [[ -n "${ALERT_WEBHOOK_CACERT:-}" ]] && [[ -f "${ALERT_WEBHOOK_CACERT}" ]]; then
+        curl_args+=(--cacert "${ALERT_WEBHOOK_CACERT}")
+    fi
+
+    if curl "${curl_args[@]}" > /dev/null 2>&1; then
+        return 0
+    else
+        log_error "Webhook delivery failed"
+        return 1
+    fi
 }
 
 # ============================================================================
 # PUBLIC API
 # ============================================================================
 
-# Send Telegram alert with rate limiting
+# Send alert via generic webhook with rate limiting
 #
-# Usage: send_telegram_alert "alert_type" "message" ["emoji"] ["prefix"]
+# Usage: send_alert "alert_type" "message" ["emoji"] ["prefix"]
 #
-send_telegram_alert() {
+# alert_type determines severity automatically:
+#   *_FAILED, *_ERROR, *_FAILURE → error (🟠)
+#   *_CRITICAL, *_DOWN           → critical (🔴)
+#   *_WARNING, *_DEGRADED        → warning (🟡)
+#   *_RECOVERED, *_RESOLVED      → notice (🔵)
+#   everything else              → info (⚪)
+#
+# Environment:
+#   ALERT_WEBHOOK_URL  - Webhook endpoint (required)
+#   ALERTS_PREFIX      - Message prefix (default: [System])
+#   RATE_LIMIT_SECONDS - Cooldown in seconds (default: 1800)
+#   STATE_DIR          - State directory (default: /var/lib/alerts)
+#
+send_alert() {
     local alert_type="$1"
     local message="$2"
-    local emoji="${3:-📟}"
-    local prefix="${4:-${TELEGRAM_PREFIX}}"
+    local emoji="${3:-}"
+    local prefix="${4:-${ALERTS_PREFIX}}"
 
-    # Check rate limit
-    if ! _check_rate_limit "$alert_type"; then
+    # Auto-derive severity and emoji if not provided
+    local severity
+    severity=$(_derive_severity "$alert_type")
+
+    if [[ -z "$emoji" ]]; then
+        case "$severity" in
+            critical) emoji="🔴" ;;
+            error)    emoji="🟠" ;;
+            warning)  emoji="🟡" ;;
+            notice)   emoji="🔵" ;;
+            info|*)   emoji="⚪" ;;
+        esac
+    fi
+
+    # Check and update rate limit atomically
+    if ! _check_and_update_rate_limit "$alert_type"; then
         return 0  # Silently skip (rate limited)
     fi
 
     # Build message
-    local full_message="${emoji} ${prefix} ${message}"
+    local full_message
+    if [[ -n "$prefix" ]]; then
+        full_message="${emoji} ${prefix}: ${message}"
+    else
+        full_message="${emoji} ${message}"
+    fi
 
     # Send
-    if _send_telegram_message "$full_message"; then
-        _update_rate_limit "$alert_type"
-        log_info "Alert sent: $alert_type"
+    if _send_webhook_message "$full_message"; then
+        log_info "Alert sent: $alert_type (severity: $severity)"
         return 0
     else
         log_error "Failed to send alert: $alert_type"
@@ -202,47 +301,9 @@ send_telegram_alert() {
     fi
 }
 
-# Send smart alert with deduplication (only on state change)
-#
-# Usage: send_smart_alert "alert_type" "identifier" "message" ["emoji"]
-#
-# Only sends alert if:
-#   - This is the first occurrence of this alert type + identifier
-#   - The message content has changed since last alert
-#
-send_smart_alert() {
-    local alert_type="$1"
-    local identifier="$2"
-    local message="$3"
-    local emoji="${4:-🔔}"
-
-    local state_file="${STATE_DIR}/.smart_${alert_type}_${identifier}"
-    local content_hash
-    content_hash=$(_alerts_get_hash "$message")
-
-    # Check if state changed
-    if [[ -f "$state_file" ]]; then
-        local last_hash
-        last_hash=$(cat "$state_file" 2>/dev/null)
-
-        if [[ "$last_hash" == "$content_hash" ]]; then
-            log_debug "Smart alert suppressed (no change): $alert_type/$identifier"
-            return 0
-        fi
-    fi
-
-    # State changed - send alert
-    if send_telegram_alert "${alert_type}_${identifier}" "$message" "$emoji"; then
-        _alerts_write_file "$content_hash" "$state_file"
-        return 0
-    fi
-
-    return 1
-}
-
 # Send recovery alert (service restored)
 #
-# Usage: send_recovery_alert "alert_type" "identifier" "message"
+# Usage: send_recovery_alert "alert_type" "identifier" ["message"]
 #
 send_recovery_alert() {
     local alert_type="$1"
@@ -254,28 +315,33 @@ send_recovery_alert() {
         return 0
     fi
 
-    local state_file="${STATE_DIR}/.smart_${alert_type}_${identifier}"
+    local safe_type safe_id
+    safe_type=$(_sanitize_alert_id "$alert_type")
+    safe_id=$(_sanitize_alert_id "$identifier")
+    local state_file="${STATE_DIR}/.smart_${safe_type}_${safe_id}"
 
     # Only send recovery if there was a previous alert
     if [[ -f "$state_file" ]]; then
         # Clear state
         rm -f "$state_file" 2>/dev/null
 
-        # Send recovery notification
-        send_telegram_alert "${alert_type}_${identifier}_recovered" "$message" "✅" "[Recovery]"
+        # Send recovery notification with RECOVERED suffix for auto-severity
+        send_alert "${alert_type}_RECOVERED" "$message" "✅" "[Recovery]"
         return $?
     fi
 
     return 0
 }
 
-# Clear rate limit for an alert type (for testing)
+# Clear rate limit for an alert type (for testing or manual reset)
 #
 # Usage: clear_rate_limit "alert_type"
 #
 clear_rate_limit() {
     local alert_type="$1"
-    local rate_file="${STATE_DIR}/.rate_limit_${alert_type}"
+    local safe_type
+    safe_type=$(_sanitize_alert_id "$alert_type")
+    local rate_file="${STATE_DIR}/.last_alert_${safe_type}"
 
     rm -f "$rate_file" 2>/dev/null
     log_debug "Rate limit cleared: $alert_type"
@@ -286,21 +352,31 @@ clear_rate_limit() {
 # ============================================================================
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Alerts Library v1.0.0"
+    echo "Alerts Library v2.0.0"
     echo ""
     echo "Required environment variables:"
-    echo "  TELEGRAM_BOT_TOKEN - Your Telegram bot token"
-    echo "  TELEGRAM_CHAT_ID   - Target chat ID"
+    echo "  ALERT_WEBHOOK_URL - Slack-compatible webhook URL"
+    echo "    Examples:"
+    echo "      Mattermost: https://your-mm.example.com/hooks/TOKEN"
+    echo "      Slack:      https://hooks.slack.com/services/T/B/TOKEN"
+    echo "      Discord:    https://discord.com/api/webhooks/ID/TOKEN"
     echo ""
     echo "Optional configuration:"
-    echo "  TELEGRAM_PREFIX      = ${TELEGRAM_PREFIX}"
-    echo "  RATE_LIMIT_SECONDS   = ${RATE_LIMIT_SECONDS}"
-    echo "  STATE_DIR            = ${STATE_DIR}"
+    echo "  ALERT_WEBHOOK_CACERT   = ${ALERT_WEBHOOK_CACERT:-<not set>}"
+    echo "  ALERTS_PREFIX          = ${ALERTS_PREFIX}"
+    echo "  RATE_LIMIT_SECONDS     = ${RATE_LIMIT_SECONDS}"
+    echo "  STATE_DIR              = ${STATE_DIR}"
     echo "  ENABLE_RECOVERY_ALERTS = ${ENABLE_RECOVERY_ALERTS}"
     echo ""
     echo "Available functions:"
-    echo "  - send_telegram_alert(type, message, [emoji], [prefix])"
-    echo "  - send_smart_alert(type, identifier, message, [emoji])"
-    echo "  - send_recovery_alert(type, identifier, message)"
+    echo "  - send_alert(type, message, [emoji], [prefix])"
+    echo "  - send_recovery_alert(type, identifier, [message])"
     echo "  - clear_rate_limit(type)"
+    echo ""
+    echo "Severity auto-derivation from alert_type patterns:"
+    echo "  *_CRITICAL, *_DOWN      → critical 🔴"
+    echo "  *_FAILED, *_ERROR       → error    🟠"
+    echo "  *_WARNING, *_DEGRADED   → warning  🟡"
+    echo "  *_RECOVERED, *_RESOLVED → notice   🔵"
+    echo "  everything else         → info     ⚪"
 fi

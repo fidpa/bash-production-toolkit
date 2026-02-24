@@ -8,10 +8,9 @@ Ready-to-run examples demonstrating the Bash Production Toolkit libraries.
 cd bash-production-toolkit
 ```
 
-For alerting examples, set Telegram credentials:
+For alerting examples, set webhook URL:
 ```bash
-export TELEGRAM_BOT_TOKEN="your-token"
-export TELEGRAM_CHAT_ID="your-chat-id"
+export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
 ```
 
 ## Examples
@@ -20,7 +19,7 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 |--------|--------------|----------------|
 | `01-logging-basics.sh` | Log levels, aliases, structured logging | logging.sh |
 | `02-file-operations.sh` | Atomic writes, permissions, path validation | logging.sh, secure-file-utils.sh |
-| `03-telegram-alerts.sh` | Alerts, rate limiting, smart deduplication | logging.sh, alerts.sh |
+| `03-webhook-alerts.sh` | Alerts, rate limiting, severity auto-derivation | logging.sh, alerts.sh |
 | `04-device-detection.sh` | Device detection, architecture, conditional execution | logging.sh, device-detection.sh |
 | `05-error-handling.sh` | Error handlers, safe execution, recovery | logging.sh, error-handling.sh |
 | `06-monitoring-script.sh` | Complete monitoring script | All libraries |
@@ -34,10 +33,9 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 ./examples/04-device-detection.sh
 ./examples/05-error-handling.sh
 
-# Telegram examples (require credentials)
-export TELEGRAM_BOT_TOKEN="..."
-export TELEGRAM_CHAT_ID="..."
-./examples/03-telegram-alerts.sh
+# Alerting examples (require webhook URL)
+export ALERT_WEBHOOK_URL="https://your-webhook/TOKEN"
+./examples/03-webhook-alerts.sh
 ./examples/06-monitoring-script.sh
 ```
 

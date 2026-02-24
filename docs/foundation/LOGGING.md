@@ -1,7 +1,7 @@
 # Logging Libraries
 
 This document covers two logging libraries:
-- **logging.sh** (v1.1.0) - Full-featured structured logging
+- **logging.sh** (v2.0.0) - Full-featured structured logging (6-level, RFC 5424 aligned)
 - **simple-logging.sh** (v1.1.1) - Lightweight logging for simple scripts
 
 ## Quick Decision Guide
@@ -17,9 +17,10 @@ This document covers two logging libraries:
 
 ---
 
-# logging.sh (v2.8.1)
+# logging.sh (v2.0.0)
 
 Full-featured structured logging with journald integration, JSON output, file rotation, and performance metrics.
+6 log levels aligned with RFC 5424 syslog priorities (DEBUG through CRITICAL).
 
 ## Quick Start
 
@@ -33,9 +34,10 @@ export LOG_LEVEL="INFO"
 export LOG_TO_JOURNAL="true"
 
 log_info "Application started"
+log_notice "Service ready and accepting connections"  # Significant positive event
 log_warn "Configuration not found, using defaults"
 log_error "Failed to connect to database"
-log_success "Migration completed"
+log_critical "Data corruption detected, halting"
 ```
 
 ## Installation
@@ -87,11 +89,18 @@ log_critical "message" [context...]
 ```
 Log a CRITICAL level message for severe errors.
 
-#### log_success
+#### log_notice
+```bash
+log_notice "message" [context...]
+```
+Log a NOTICE level message. Use for significant but non-warning events:
+service started, task completed, configuration loaded, failover successful.
+
+#### log_success _(deprecated)_
 ```bash
 log_success "message" [context...]
 ```
-Log a success message (alias for log_info with success semantics).
+Deprecated alias for `log_notice()`. Will be removed in v3.0.0.
 
 ### Structured Logging Functions
 
@@ -109,7 +118,7 @@ log_info_structured "Failover completed" \
     "DURATION_MS=234"
 ```
 
-Similar functions: `log_error_structured`, `log_warn_structured`, `log_debug_structured`, `log_critical_structured`
+Similar functions: `log_notice_structured`, `log_error_structured`, `log_warn_structured`, `log_debug_structured`, `log_critical_structured`
 
 ### JSON Logging
 
@@ -130,11 +139,12 @@ log_json "INFO" "Request completed" "status=200" "duration=45ms"
 For backward compatibility:
 - `log()` - Generic log (auto-detects level from message prefix)
 - `info()` - Alias for log_info
+- `notice()` - Alias for log_notice
 - `warn()` / `warning()` - Alias for log_warn
 - `error()` - Alias for log_error
 - `debug()` - Alias for log_debug
 - `critical()` - Alias for log_critical
-- `success()` - Wrapper with ✓ prefix
+- `success()` - Alias for log_notice with ✓ prefix (was log_info in v1.x)
 - `failure()` - Wrapper with ✗ prefix
 
 ### Utility Functions
@@ -153,7 +163,7 @@ Escape a string for safe JSON embedding.
 
 #### get_log_level_value
 ```bash
-value=$(get_log_level_value "WARN")  # Returns 2
+value=$(get_log_level_value "WARN")  # Returns 3
 ```
 Convert level string to numeric value for comparison.
 
@@ -163,7 +173,7 @@ Convert level string to numeric value for comparison.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, WARN, ERROR, CRITICAL |
+| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL |
 | `LOG_FORMAT` | `standard` | Output format: standard, json, compact |
 | `LOG_TO_JOURNAL` | `false` | Enable journald integration |
 | `LOG_TO_STDOUT` | `true` | Output to terminal |
@@ -172,18 +182,24 @@ Convert level string to numeric value for comparison.
 | `LOG_ROTATE_SIZE` | `10M` | Rotation trigger size |
 | `LOG_ROTATE_COUNT` | `5` | Number of rotated logs to keep |
 | `LOG_PERFORMANCE` | `true` | Enable performance metrics on exit |
+| `APP_ENV` | (auto-detected) | Override environment: prod, dev, test |
 | `CORRELATION_ID` | (auto-generated) | Request tracking ID |
 | `SCRIPT_NAME` | (auto-detected) | Script identifier for logs |
 
-### Log Levels
+### Log Levels (RFC 5424 aligned)
 
-| Level | Value | Use For |
-|-------|-------|---------|
-| DEBUG | 0 | Detailed debugging information |
-| INFO | 1 | General operational messages |
-| WARN | 2 | Warning conditions |
-| ERROR | 3 | Error conditions |
-| CRITICAL | 4 | Critical failures |
+| Level | Value | syslog Priority | Use For |
+|-------|-------|-----------------|---------|
+| DEBUG | 0 | debug (7) | Detailed debugging information |
+| INFO | 1 | informational (6) | General operational messages |
+| NOTICE | 2 | notice (5) | Significant events, milestones |
+| WARN | 3 | warning (4) | Warning conditions, degraded state |
+| ERROR | 4 | error (3) | Error conditions, failed operations |
+| CRITICAL | 5 | critical (2) | Critical failures, immediate action required |
+
+**When to use NOTICE vs INFO:**
+- `log_info` → routine operations (loop iterations, file reads, checks)
+- `log_notice` → significant events (service started, task completed, failover succeeded)
 
 ### Level Filtering
 
@@ -267,7 +283,7 @@ log_info "Batch complete"
 
 ---
 
-# simple-logging.sh (v1.1.1)
+# simple-logging.sh (v1.0.0)
 
 Lightweight logging library for git hooks, simple scripts, and cross-platform use.
 

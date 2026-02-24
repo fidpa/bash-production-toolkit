@@ -1,6 +1,7 @@
-# Alerts Library (v1.1.0)
+# Alerts Library (v2.0.0)
 
-Telegram alerting with rate limiting, smart deduplication, and recovery notifications.
+Generic webhook alerting with rate limiting, severity auto-derivation, and recovery notifications.
+Works with any Slack-compatible webhook: Mattermost, Slack, Discord, or custom endpoints.
 
 ## Quick Start
 
@@ -10,18 +11,16 @@ set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
-export TELEGRAM_BOT_TOKEN="123456:ABC-xyz"
-export TELEGRAM_CHAT_ID="-1001234567890"
-export TELEGRAM_PREFIX="[MyApp]"
+export ALERT_WEBHOOK_URL="https://mattermost.example.com/hooks/TOKEN"
+export ALERTS_PREFIX="[MyApp]"
 
-# Send rate-limited alert
-send_telegram_alert "backup_failed" "Backup failed: disk full" "❌"
-
-# Send smart alert (only on state change)
-send_smart_alert "disk_space" "server1" "Disk space low: 90%" "⚠️"
+# Send rate-limited alert (severity auto-derived from type name)
+send_alert "BACKUP_FAILED" "Backup failed: disk full"
+# → emoji: 🟠, severity: error (from *_FAILED pattern)
 
 # Send recovery notification
-send_recovery_alert "disk_space" "server1" "Disk space recovered: 45%"
+send_alert "SERVICE_RECOVERED" "nginx is back online"
+# → emoji: 🔵, severity: notice (from *_RECOVERED pattern)
 ```
 
 ## Installation
@@ -30,100 +29,105 @@ send_recovery_alert "disk_space" "server1" "Disk space recovered: 45%"
 source /path/to/bash-production-toolkit/src/monitoring/alerts.sh
 ```
 
+## Migration from v1.x
+
+```bash
+# Before (v1.x — Telegram)
+export TELEGRAM_BOT_TOKEN="123:abc"
+export TELEGRAM_CHAT_ID="-1234"
+export TELEGRAM_PREFIX="[MyApp]"
+send_telegram_alert "backup_failed" "Disk full" "❌"
+
+# After (v2.0.0 — Generic Webhook)
+export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
+export ALERTS_PREFIX="[MyApp]"
+send_alert "BACKUP_FAILED" "Disk full"
+# emoji and severity auto-derived from type name
+```
+
 ## Configuration
 
 ### Required Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | Chat/group ID for notifications |
+| `ALERT_WEBHOOK_URL` | Slack-compatible webhook endpoint URL |
 
 ### Optional Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TELEGRAM_PREFIX` | `[System]` | Prefix for all messages |
+| `ALERT_WEBHOOK_CACERT` | `<not set>` | Path to CA cert for self-signed TLS |
+| `ALERTS_PREFIX` | `[System]` | Prefix for all messages |
 | `RATE_LIMIT_SECONDS` | `1800` | Cooldown between identical alerts (30 min) |
 | `STATE_DIR` | `/var/lib/alerts` | Directory for state files |
 | `ENABLE_RECOVERY_ALERTS` | `true` | Send recovery notifications |
 
-### Getting Telegram Credentials
+### Supported Webhook Endpoints
 
-1. Create a bot via [@BotFather](https://t.me/BotFather)
-2. Get the bot token (format: `123456789:ABCdefGHI...`)
-3. Add the bot to your group/channel
-4. Get chat ID via: `curl "https://api.telegram.org/bot<TOKEN>/getUpdates"`
+The library sends Slack-compatible JSON `{"text": "..."}` payloads:
+
+| Service | URL Format |
+|---------|-----------|
+| **Mattermost** | `https://your-mm.example.com/hooks/TOKEN` |
+| **Slack** | `https://hooks.slack.com/services/T/B/TOKEN` |
+| **Discord** | `https://discord.com/api/webhooks/ID/TOKEN` |
+| **Custom** | Any endpoint accepting `{"text": "..."}` |
 
 ## API Reference
 
-### send_telegram_alert
+### send_alert
 
 ```bash
-send_telegram_alert "alert_type" "message" [emoji] [prefix]
+send_alert "ALERT_TYPE" "message" [emoji] [prefix]
 ```
 
-Send a rate-limited Telegram alert.
+Send a rate-limited webhook alert. Severity and emoji are auto-derived from the alert type name.
 
 **Parameters:**
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| alert_type | Yes | - | Unique identifier for rate limiting |
-| message | Yes | - | Alert message (supports HTML) |
-| emoji | No | 📟 | Emoji prefix |
-| prefix | No | `$TELEGRAM_PREFIX` | Message prefix |
+| ALERT_TYPE | Yes | - | Unique identifier (UPPER_SNAKE_CASE recommended) |
+| message | Yes | - | Alert message text |
+| emoji | No | (auto) | Override emoji (disables auto-derivation) |
+| prefix | No | `$ALERTS_PREFIX` | Override message prefix |
+
+**Severity Auto-Derivation:**
+
+| Pattern | Severity | Emoji | Example Types |
+|---------|----------|-------|---------------|
+| `*_CRITICAL`, `*_DOWN` | critical | 🔴 | `SERVICE_DOWN`, `DB_CRITICAL` |
+| `*_FAILED`, `*_ERROR`, `*_FAILURE` | error | 🟠 | `BACKUP_FAILED`, `DISK_ERROR` |
+| `*_WARNING`, `*_DEGRADED`, `*_HIGH` | warning | 🟡 | `CPU_HIGH`, `DISK_DEGRADED` |
+| `*_RECOVERED`, `*_RESOLVED`, `*_SUCCESS` | notice | 🔵 | `SERVICE_RECOVERED`, `DISK_RESOLVED` |
+| everything else | info | ⚪ | `SYSTEM_BOOT`, `TASK_NEW` |
 
 **Rate Limiting:**
-- Each `alert_type` has independent cooldown
+- Each `ALERT_TYPE` has an independent cooldown
 - Default: 30 minutes between identical alerts
 - Customize via `RATE_LIMIT_SECONDS`
 
 **Returns:**
 - 0: Alert sent or rate-limited (success)
-- 1: Error (API failure, missing config)
+- 1: Error (delivery failure, missing `ALERT_WEBHOOK_URL`)
 
-**Example:**
+**Examples:**
 ```bash
-# Basic alert
-send_telegram_alert "cpu_high" "CPU usage: 95%"
+# Severity auto-derived from type name
+send_alert "BACKUP_FAILED" "Backup failed at 03:00"       # 🟠 error
+send_alert "SERVICE_DOWN" "nginx not responding"           # 🔴 critical
+send_alert "DISK_HIGH" "Disk usage at 85%"                # 🟡 warning
+send_alert "SERVICE_RECOVERED" "nginx is back online"     # 🔵 notice
+send_alert "SYSTEM_BOOT" "Server rebooted"                # ⚪ info
 
-# With custom emoji
-send_telegram_alert "backup_failed" "Backup failed" "🚨"
+# Custom emoji (overrides auto-derivation)
+send_alert "BACKUP_FAILED" "Backup failed" "🚨"
 
-# HTML formatting
-send_telegram_alert "deploy" "<b>Deployment</b> completed\n<code>v2.1.0</code>" "✅"
-```
+# Custom prefix per alert
+send_alert "DEPLOY_COMPLETE" "v2.0 deployed" "" "[Deployment]"
 
-### send_smart_alert
-
-```bash
-send_smart_alert "alert_type" "identifier" "message" [emoji]
-```
-
-Send alert only when state changes (prevents duplicate alerts).
-
-**Parameters:**
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| alert_type | Yes | Alert category |
-| identifier | Yes | Unique instance identifier |
-| message | Yes | Alert message |
-| emoji | No | Emoji prefix |
-
-**State Tracking:**
-- Stores hash of last message per `alert_type`+`identifier`
-- Only sends when content changes
-- Persists across script runs
-
-**Example:**
-```bash
-# Only sends if disk usage changed
-disk_usage=$(df -h / | awk 'NR==2 {print $5}')
-send_smart_alert "disk_space" "root" "Root disk: ${disk_usage}" "💾"
-
-# Different identifiers = separate tracking
-send_smart_alert "disk_space" "data" "Data disk: 45%"
-send_smart_alert "disk_space" "backup" "Backup disk: 80%"
+# Suppress prefix (empty string)
+send_alert "HEARTBEAT" "All systems nominal" "💚" ""
 ```
 
 ### send_recovery_alert
@@ -132,7 +136,7 @@ send_smart_alert "disk_space" "backup" "Backup disk: 80%"
 send_recovery_alert "alert_type" "identifier" [message]
 ```
 
-Send recovery notification and clear state.
+Send recovery notification and clear state. Only sends if a prior state file exists.
 
 **Parameters:**
 | Parameter | Required | Default | Description |
@@ -142,17 +146,18 @@ Send recovery notification and clear state.
 | message | No | "Recovered" | Recovery message |
 
 **Behavior:**
-- Only sends if there was a previous alert
+- Sends with `_RECOVERED` suffix (→ notice severity, 🔵)
+- Only sends if there was a previous state file
 - Clears stored state for this `alert_type`+`identifier`
 - Can be disabled via `ENABLE_RECOVERY_ALERTS=false`
 
 **Example:**
 ```bash
-# Check service status
 if systemctl is-active nginx; then
     send_recovery_alert "service_down" "nginx" "nginx is back online"
 else
-    send_smart_alert "service_down" "nginx" "nginx is not running" "🚨"
+    # Use smart-alerts.sh send_smart_alert for state-change deduplication
+    send_alert "SERVICE_DOWN" "nginx is not running"
 fi
 ```
 
@@ -162,13 +167,12 @@ fi
 clear_rate_limit "alert_type"
 ```
 
-Clear rate limit for testing.
+Clear rate limit for an alert type (useful for testing or manual reset).
 
 **Example:**
 ```bash
-# Clear rate limit to resend immediately
-clear_rate_limit "backup_failed"
-send_telegram_alert "backup_failed" "Testing alert"
+clear_rate_limit "BACKUP_FAILED"
+send_alert "BACKUP_FAILED" "Testing alert delivery"
 ```
 
 ## State Files
@@ -177,10 +181,9 @@ The library stores state in `STATE_DIR`:
 
 ```
 $STATE_DIR/
-├── .rate_limit_backup_failed     # Timestamp of last alert
-├── .rate_limit_cpu_high          # Per-alert-type rate limits
-├── .smart_disk_space_root        # Content hash for smart alerts
-└── .smart_service_down_nginx     # Per-identifier state
+├── .last_alert_BACKUP_FAILED      # Timestamp of last alert (rate limiting)
+├── .last_alert_SERVICE_DOWN       # Per-alert-type rate limits
+└── .smart_service_down_nginx      # Per-identifier state (recovery tracking)
 ```
 
 ## Examples
@@ -193,29 +196,20 @@ set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
-export TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}"
-export TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID}"
-export TELEGRAM_PREFIX="[Monitor]"
+export ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL}"
+export ALERTS_PREFIX="[Monitor]"
 export RATE_LIMIT_SECONDS=3600  # 1 hour
 
 # CPU check
 cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print int($2)}')
 if [[ $cpu -gt 90 ]]; then
-    send_telegram_alert "cpu_high" "CPU usage: ${cpu}%" "🔥"
-fi
-
-# Memory check
-mem=$(free | awk '/Mem:/ {printf "%.0f", $3/$2 * 100}')
-if [[ $mem -gt 85 ]]; then
-    send_telegram_alert "memory_high" "Memory usage: ${mem}%" "💾"
+    send_alert "CPU_HIGH" "CPU usage: ${cpu}%"
 fi
 
 # Disk check
 disk=$(df / | awk 'NR==2 {print int($5)}')
 if [[ $disk -gt 80 ]]; then
-    send_smart_alert "disk_full" "root" "Disk usage: ${disk}%" "📀"
-else
-    send_recovery_alert "disk_full" "root" "Disk back to normal: ${disk}%"
+    send_alert "DISK_HIGH" "Root disk usage: ${disk}%"
 fi
 ```
 
@@ -233,12 +227,31 @@ for service in "${SERVICES[@]}"; do
     if systemctl is-active --quiet "$service"; then
         send_recovery_alert "service_down" "$service" "${service} is running"
     else
-        send_smart_alert "service_down" "$service" "${service} is DOWN" "🚨"
+        send_alert "SERVICE_DOWN" "${service} is not running"
     fi
 done
 ```
 
-### Backup Status Notifications
+### Backup Notifications
+
+```bash
+#!/bin/bash
+set -uo pipefail
+
+source /path/to/foundation/logging.sh
+source /path/to/monitoring/alerts.sh
+
+export ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL}"
+export ALERTS_PREFIX="[Backup]"
+
+if restic backup /data; then
+    send_alert "BACKUP_SUCCESS" "Daily backup completed successfully"
+else
+    send_alert "BACKUP_FAILED" "Daily backup failed - check logs"
+fi
+```
+
+### Self-Signed TLS (e.g., step-ca)
 
 ```bash
 #!/bin/bash
@@ -246,221 +259,38 @@ set -uo pipefail
 
 source /path/to/monitoring/alerts.sh
 
-export TELEGRAM_PREFIX="[Backup]"
+export ALERT_WEBHOOK_URL="https://mattermost.internal/hooks/TOKEN"
+export ALERT_WEBHOOK_CACERT="/usr/local/share/ca-certificates/step-ca.crt"
 
-backup_result=0
-backup_size=""
-
-# Run backup
-if restic backup /data --json | tee /tmp/backup.log; then
-    backup_size=$(jq -r '.total_bytes_processed' /tmp/backup.log | numfmt --to=iec)
-    backup_result=0
-else
-    backup_result=$?
-fi
-
-if [[ $backup_result -eq 0 ]]; then
-    send_telegram_alert "backup_daily" "✅ Backup completed\nSize: ${backup_size}" "📦"
-else
-    send_telegram_alert "backup_failed" "❌ Backup FAILED\nExit code: ${backup_result}" "🚨"
-fi
+send_alert "SYSTEM_BOOT" "Server restarted"
 ```
 
-### Docker Container Monitoring
-
-```bash
-#!/bin/bash
-set -uo pipefail
-
-source /path/to/monitoring/alerts.sh
-
-containers=$(docker ps -a --format '{{.Names}}')
-
-for container in $containers; do
-    status=$(docker inspect -f '{{.State.Status}}' "$container")
-
-    case "$status" in
-        running)
-            send_recovery_alert "container_down" "$container"
-            ;;
-        exited|dead)
-            exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container")
-            send_smart_alert "container_down" "$container" \
-                "Container ${container} is ${status} (exit: ${exit_code})" "🐳"
-            ;;
-    esac
-done
-```
-
-## Rate Limiting Strategies
+## Rate Limiting
 
 ### Per-Alert-Type Limiting
 
+Each alert type has an independent cooldown:
+
 ```bash
-# Each type has its own cooldown
 export RATE_LIMIT_SECONDS=1800
 
-send_telegram_alert "cpu_high" "..."    # Sent
-send_telegram_alert "cpu_high" "..."    # Rate-limited for 30 min
-send_telegram_alert "memory_high" "..." # Sent (different type)
+send_alert "CPU_HIGH" "..."    # Sent
+send_alert "CPU_HIGH" "..."    # Rate-limited for 30 min
+send_alert "DISK_HIGH" "..."   # Sent (different type)
 ```
 
-### Custom Cooldowns
+### Inline Override
 
 ```bash
 # Critical alerts: shorter cooldown
-RATE_LIMIT_SECONDS=300 send_telegram_alert "critical" "..."
+RATE_LIMIT_SECONDS=300 send_alert "SERVICE_DOWN" "..."
 
 # Low-priority: longer cooldown
-RATE_LIMIT_SECONDS=7200 send_telegram_alert "info" "..."
+RATE_LIMIT_SECONDS=7200 send_alert "HEALTH_CHECK" "All OK"
 ```
-
-### Smart Deduplication vs Rate Limiting
-
-| Feature | send_telegram_alert | send_smart_alert |
-|---------|---------------------|------------------|
-| Deduplication | Time-based | Content-based |
-| Repeat same message | After cooldown | Never (until changed) |
-| Tracks state | Timestamp only | Message hash |
-| Best for | Time-sensitive alerts | State changes |
-
-## HTML Formatting
-
-Telegram supports HTML in messages:
-
-```bash
-send_telegram_alert "deploy" "
-<b>Deployment Complete</b>
-
-Version: <code>v2.1.0</code>
-Server: <i>production</i>
-
-<a href='https://example.com/logs'>View Logs</a>
-" "🚀"
-```
-
-Supported tags: `<b>`, `<i>`, `<code>`, `<pre>`, `<a href=''>`, `<s>`, `<u>`
-
-## Error Handling
-
-```bash
-# Check if alert was sent
-if send_telegram_alert "test" "Test message"; then
-    echo "Alert sent or rate-limited"
-else
-    echo "Alert failed (check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)"
-fi
-
-# Ensure state directory exists
-mkdir -p "${STATE_DIR:-/var/lib/alerts}"
-```
-
-## Real-World Examples
-
-### AIDE Failure Alerting
-
-Production-grade integration with AIDE file integrity monitoring (from [ubuntu-server-security](https://github.com/fidpa/ubuntu-server-security)).
-
-**Use Case**: Instant Telegram alerts when AIDE database updates fail, triggered via systemd OnFailure hook.
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# Bash Production Toolkit path
-BASH_TOOLKIT_PATH="${BASH_TOOLKIT_PATH:-/usr/local/lib/bash-production-toolkit}"
-
-# Import libraries
-source "${BASH_TOOLKIT_PATH}/src/foundation/logging.sh"
-source "${BASH_TOOLKIT_PATH}/src/monitoring/alerts.sh"
-
-# Configuration
-export TELEGRAM_PREFIX="[🚨 AIDE]"
-export STATE_DIR="/var/lib/aide"
-export RATE_LIMIT_SECONDS=3600  # 1h Rate Limit (prevents spam)
-
-main() {
-    log_info "AIDE Failure Alert"
-
-    # Get service status
-    local exit_code
-    exit_code=$(systemctl show aide-update.service -p ExecMainStatus --value)
-
-    local active_state
-    active_state=$(systemctl show aide-update.service -p ActiveState --value)
-
-    # Get hostname
-    local hostname
-    hostname=$(hostname -f 2>/dev/null || hostname)
-
-    # Construct alert message
-    local alert_msg
-    alert_msg="⚠️ AIDE File Integrity Check FAILED!
-
-🖥️ Device: ${hostname}
-❌ Status: ${active_state}
-🔢 Exit Code: ${exit_code}
-⏰ Time: $(date '+%Y-%m-%d %H:%M:%S')
-
-⚡ Critical: File Integrity Monitoring non-functional!
-
-📋 Logs:
-journalctl -u aide-update.service -n 50"
-
-    # Send alert with rate limiting
-    if send_telegram_alert "aide-failure" "$alert_msg" "🚨"; then
-        log_info "✅ Telegram alert sent successfully"
-    else
-        log_error "❌ Failed to send Telegram alert"
-        return 1
-    fi
-}
-
-main "$@"
-```
-
-**systemd Integration**:
-
-```ini
-# /etc/systemd/system/aide-update.service
-[Unit]
-Description=AIDE Database Update
-OnFailure=aide-failure-alert.service
-
-# ... rest of service config
-```
-
-```ini
-# /etc/systemd/system/aide-failure-alert.service
-[Unit]
-Description=AIDE Failure Alert
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/aide/aide-failure-alert.sh
-
-# Credentials (Option 1: Simple ENV vars)
-Environment="TELEGRAM_BOT_TOKEN=your-bot-token"
-Environment="TELEGRAM_CHAT_ID=your-chat-id"
-
-# Credentials (Option 2: Vaultwarden - see ubuntu-server-security docs)
-# Environment="VAULTWARDEN_URL=https://vault.example.com"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Features Demonstrated**:
-- ✅ Rate limiting (1 alert per hour) prevents Telegram spam
-- ✅ Systemd OnFailure hook for instant triggering (<1s latency)
-- ✅ Rich context (hostname, exit code, logs)
-- ✅ Production logging via logging.sh
-- ✅ Two configuration modes (simple ENV vars vs. Vaultwarden)
-
-**Full Implementation**: See [ubuntu-server-security/docs/FAILURE_ALERTING.md](https://github.com/fidpa/ubuntu-server-security/blob/main/docs/FAILURE_ALERTING.md)
 
 ## See Also
 
-- [SMART_ALERTS.md](SMART_ALERTS.md) - Advanced event tracking with grace periods
+- [SMART_ALERTS.md](SMART_ALERTS.md) - Grace periods, event aggregation, state machine
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Dependency information
 - [ERROR_HANDLING.md](../foundation/ERROR_HANDLING.md) - For alerting on errors

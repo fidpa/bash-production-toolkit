@@ -4,7 +4,19 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Smart Alerts Library
-# Version: 1.0.1
+# Version: 2.0.0 (Updated: 24.02.2026)
+# Changelog v2.0.0 (24.02.2026): Aligned with alerts.sh v2.0.0 webhook backend
+#   - BREAKING: Uses send_alert() instead of send_telegram_alert()
+#   - BREAKING: Uses send_recovery_alert() with new signature (no send_telegram_alert)
+#   - IMPROVED: _sa_send_immediate_alert() → uses send_alert() with CRITICAL suffix
+#   - IMPROVED: _sa_send_pending_alert() → uses send_alert()
+#   - ALIGNED: With alerts.sh v2.0.0 generic webhook backend
+# Changelog v1.0.1 (2026-01-01): Dependency Loading Improvements
+#   - FIX: Explicit error handling for secure-file-utils.sh dependency
+#   - ADDED: Function check (declare -F sfu_write_file) before sourcing
+#   - IMPROVED: Clear error messages when dependencies are missing
+#   - ALIGNED: With server repo v1.1.1 best practices
+# Changelog v1.0.0 (2026-01-01): Initial public release
 #
 # Purpose:
 #   Intelligent alert management to reduce alert fatigue through
@@ -23,25 +35,18 @@
 #   sa_check_pending_alerts  # Call periodically to process pending alerts
 #
 # Dependencies:
-#   - alerts.sh (for sending)
+#   - alerts.sh v2.0.0+ (for sending via send_alert())
 #   - secure-file-utils.sh (for atomic state file operations)
 #   - logging.sh (optional)
 #   - jq (required for JSON state files)
 #
 # Configuration (environment variables):
-#   SMART_ALERT_GRACE_PERIOD     - Seconds before alerting (default: 180)
+#   SMART_ALERT_GRACE_PERIOD       - Seconds before alerting (default: 180)
 #   SMART_ALERT_RECOVERY_THRESHOLD - Minimum downtime for recovery alert (default: 300)
 #   SMART_ALERT_AGGREGATION_WINDOW - Seconds to aggregate events (default: 300)
-#   SMART_ALERT_STATE_DIR        - State file directory (default: /var/lib/smart-alerts)
-#   SMART_ALERT_ENABLED          - Enable/disable smart alerts (default: true)
-#
-# Changelog:
-#   v1.0.1 (2026-01-01): Dependency Loading Improvements
-#     - FIX: Explicit error handling for secure-file-utils.sh dependency
-#     - ADDED: Function check (declare -F sfu_write_file) before sourcing
-#     - IMPROVED: Clear error messages when dependencies are missing
-#     - ALIGNED: With server repo v1.1.1 best practices
-#   v1.0.0 (2026-01-01): Initial public release
+#   SMART_ALERT_STATE_DIR          - State file directory (default: /var/lib/smart-alerts)
+#   SMART_ALERT_ENABLED            - Enable/disable smart alerts (default: true)
+#   ALERT_WEBHOOK_URL              - Webhook URL (passed through to alerts.sh)
 
 set -uo pipefail
 
@@ -75,9 +80,12 @@ readonly SA_CRITICAL_EVENTS=(
     "CRITICAL_SERVICE_DOWN"
 )
 
-# jq filter constants
+# jq filter constants (single quotes are intentional — these are jq expressions, not bash)
+# shellcheck disable=SC2016,SC2034
 readonly JQ_PARSE_EVENT_STATE='[.first_seen, .last_seen, .alert_sent, .message, .details] | @tsv'
+# shellcheck disable=SC2016
 readonly JQ_UPDATE_LAST_SEEN='.last_seen = ($timestamp | tonumber)'
+# shellcheck disable=SC2016
 readonly JQ_MARK_ALERTED='.alert_sent = true | .status = "alerted"'
 
 # ============================================================================
@@ -131,12 +139,22 @@ sa_init() {
     mkdir -p "${SA_EVENTS_DIR}" "${SA_PENDING_DIR}" 2>/dev/null || true
 
     if [[ ! -f "${SA_DOWNTIME_TRACKING}" ]]; then
-        echo '{}' > "${SA_DOWNTIME_TRACKING}"
+        sfu_write_file '{}' "${SA_DOWNTIME_TRACKING}"
     fi
 
     if [[ ! -f "${SA_AGGREGATION_QUEUE}" ]]; then
-        echo '[]' > "${SA_AGGREGATION_QUEUE}"
+        sfu_write_file '[]' "${SA_AGGREGATION_QUEUE}"
     fi
+}
+
+# ============================================================================
+# PATH SANITIZATION
+# ============================================================================
+
+# Sanitize identifier for use in file paths (prevent directory traversal)
+_sa_sanitize_id() {
+    local input="$1"
+    printf '%s' "${input//[^a-zA-Z0-9_.-]/}"
 }
 
 # ============================================================================
@@ -157,7 +175,10 @@ sa_register_event() {
 
     sa_init
 
-    local event_file="${SA_EVENTS_DIR}/${event_type}_${identifier}.json"
+    local safe_type safe_id
+    safe_type=$(_sa_sanitize_id "$event_type")
+    safe_id=$(_sa_sanitize_id "$identifier")
+    local event_file="${SA_EVENTS_DIR}/${safe_type}_${safe_id}.json"
     local now
     now=$(date +%s)
 
@@ -171,25 +192,31 @@ sa_register_event() {
     done
 
     if [[ -f "$event_file" ]]; then
-        # Update existing event
+        # Update existing event (atomic write)
         local updated
         updated=$(jq --arg timestamp "$now" "$JQ_UPDATE_LAST_SEEN" "$event_file")
-        echo "$updated" > "$event_file"
+        sfu_write_file "$updated" "$event_file"
         log_debug "Event updated: $event_type/$identifier"
     else
-        # Create new event
-        cat > "$event_file" << EOF
-{
-    "event_type": "$event_type",
-    "identifier": "$identifier",
-    "message": "$message",
-    "details": "$details",
-    "first_seen": $now,
-    "last_seen": $now,
-    "alert_sent": false,
-    "status": "pending"
-}
-EOF
+        # Create new event (jq for proper JSON escaping)
+        local new_event
+        new_event=$(jq -n \
+            --arg event_type "$event_type" \
+            --arg identifier "$identifier" \
+            --arg message "$message" \
+            --arg details "$details" \
+            --argjson now "$now" \
+            '{
+                event_type: $event_type,
+                identifier: $identifier,
+                message: $message,
+                details: $details,
+                first_seen: $now,
+                last_seen: $now,
+                alert_sent: false,
+                status: "pending"
+            }')
+        sfu_write_file "$new_event" "$event_file"
         log_debug "Event registered: $event_type/$identifier"
 
         # Critical events: immediate alert
@@ -249,7 +276,10 @@ sa_register_recovery() {
 
     [[ "${SA_ENABLED}" != "true" ]] && return 0
 
-    local event_file="${SA_EVENTS_DIR}/${event_type}_${identifier}.json"
+    local safe_type safe_id
+    safe_type=$(_sa_sanitize_id "$event_type")
+    safe_id=$(_sa_sanitize_id "$identifier")
+    local event_file="${SA_EVENTS_DIR}/${safe_type}_${safe_id}.json"
 
     if [[ -f "$event_file" ]]; then
         local first_seen alert_sent
@@ -262,8 +292,8 @@ sa_register_recovery() {
 
         # Only send recovery if alert was sent AND downtime > threshold
         if [[ "$alert_sent" == "true" ]] && [[ $downtime -ge $SA_RECOVERY_THRESHOLD ]]; then
-            if declare -F send_recovery_alert &>/dev/null; then
-                send_recovery_alert "$event_type" "$identifier" "$recovery_message (downtime: ${downtime}s)"
+            if declare -F send_alert &>/dev/null; then
+                send_alert "${event_type}_RECOVERED" "$recovery_message (downtime: ${downtime}s)" "✅" "[Recovery]"
             else
                 log_info "Recovery: $event_type/$identifier - $recovery_message (${downtime}s)"
             fi
@@ -286,18 +316,21 @@ _sa_send_immediate_alert() {
 
     log_info "Critical alert (immediate): $event_type/$identifier"
 
-    if declare -F send_telegram_alert &>/dev/null; then
-        send_telegram_alert "${event_type}_${identifier}" "🚨 CRITICAL: $message" "🚨"
+    if declare -F send_alert &>/dev/null; then
+        send_alert "${event_type}_CRITICAL" "🚨 CRITICAL: $message" "🚨"
     else
         log_error "CRITICAL: $message"
     fi
 
-    # Mark as alerted
-    local event_file="${SA_EVENTS_DIR}/${event_type}_${identifier}.json"
+    # Mark as alerted (sanitized path + atomic write)
+    local safe_type safe_id
+    safe_type=$(_sa_sanitize_id "$event_type")
+    safe_id=$(_sa_sanitize_id "$identifier")
+    local event_file="${SA_EVENTS_DIR}/${safe_type}_${safe_id}.json"
     if [[ -f "$event_file" ]]; then
         local updated
         updated=$(jq "$JQ_MARK_ALERTED" "$event_file")
-        echo "$updated" > "$event_file"
+        sfu_write_file "$updated" "$event_file"
     fi
 }
 
@@ -309,16 +342,16 @@ _sa_send_pending_alert() {
 
     log_info "Sending pending alert: $event_type/$identifier"
 
-    if declare -F send_smart_alert &>/dev/null; then
-        send_smart_alert "$event_type" "$identifier" "$message"
+    if declare -F send_alert &>/dev/null; then
+        send_alert "${event_type}_${identifier}" "$message"
     else
         log_warn "Alert: $message"
     fi
 
-    # Mark as alerted
+    # Mark as alerted (atomic write)
     local updated
     updated=$(jq "$JQ_MARK_ALERTED" "$event_file")
-    echo "$updated" > "$event_file"
+    sfu_write_file "$updated" "$event_file"
 }
 
 # ============================================================================
@@ -326,14 +359,17 @@ _sa_send_pending_alert() {
 # ============================================================================
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "Smart Alerts Library v1.0.0"
+    echo "Smart Alerts Library v2.0.0"
+    echo ""
+    echo "Required (via alerts.sh):"
+    echo "  ALERT_WEBHOOK_URL - Webhook endpoint URL"
     echo ""
     echo "Configuration:"
-    echo "  SMART_ALERT_GRACE_PERIOD     = ${SA_GRACE_PERIOD}s"
+    echo "  SMART_ALERT_GRACE_PERIOD       = ${SA_GRACE_PERIOD}s"
     echo "  SMART_ALERT_RECOVERY_THRESHOLD = ${SA_RECOVERY_THRESHOLD}s"
     echo "  SMART_ALERT_AGGREGATION_WINDOW = ${SA_AGGREGATION_WINDOW}s"
-    echo "  SMART_ALERT_STATE_DIR        = ${SA_STATE_DIR}"
-    echo "  SMART_ALERT_ENABLED          = ${SA_ENABLED}"
+    echo "  SMART_ALERT_STATE_DIR          = ${SA_STATE_DIR}"
+    echo "  SMART_ALERT_ENABLED            = ${SA_ENABLED}"
     echo ""
     echo "Available functions:"
     echo "  - sa_register_event(type, identifier, message, [details])"

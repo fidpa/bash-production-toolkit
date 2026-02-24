@@ -1,4 +1,4 @@
-# Device Detection Library (v1.2.0)
+# Device Detection Library (v1.0.0)
 
 Multi-strategy device detection for scripts that run across different hosts. Supports hostname patterns, IP-based detection, and custom device registration.
 
@@ -400,7 +400,7 @@ source /path/to/device-detection.sh
 source /path/to/monitoring/alerts.sh
 
 device=$(detect_device)
-export TELEGRAM_PREFIX="[${device}]"
+export ALERTS_PREFIX="[${device}]"
 
 # Device-specific checks
 case "$device" in

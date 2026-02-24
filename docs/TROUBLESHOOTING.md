@@ -76,41 +76,36 @@ ls -la /var/log/
 
 ### Alert Not Sending
 
-**Check 1:** Credentials set?
+**Check 1:** Webhook URL configured?
 ```bash
-echo "Token: ${TELEGRAM_BOT_TOKEN:0:10}..."
-echo "Chat ID: $TELEGRAM_CHAT_ID"
+echo "ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-<not set>}"
 ```
 
 **Solution:**
 ```bash
-export TELEGRAM_BOT_TOKEN="your-token"
-export TELEGRAM_CHAT_ID="your-chat-id"
+export ALERT_WEBHOOK_URL="https://your-mattermost/hooks/TOKEN"
 ```
 
-**Check 2:** Telegram API reachable?
+**Check 2:** Webhook reachable?
 ```bash
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"
+curl -s -X POST "$ALERT_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "test"}' && echo "OK"
 ```
 
-**Expected:** JSON with `"ok":true`
+**Expected:** `OK` (HTTP 200 from webhook)
 
 **If fails:**
-- Check network connectivity
-- Verify token is correct
-- Check firewall for api.telegram.org
+- Check network connectivity to webhook host
+- Verify webhook URL is correct and active
+- Check firewall rules for the webhook host
+- If TLS error with self-signed cert: set `ALERT_WEBHOOK_CACERT`
 
-**Check 3:** Chat ID correct?
+**Check 3:** Self-signed TLS?
 ```bash
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -d "chat_id=${TELEGRAM_CHAT_ID}" \
-  -d "text=Test"
+# If webhook uses internal CA (e.g. step-ca), configure cert:
+export ALERT_WEBHOOK_CACERT="/usr/local/share/ca-certificates/my-ca.crt"
 ```
-
-**Common errors:**
-- `"chat not found"` - Wrong chat ID or bot not in group
-- `"bot was blocked"` - User blocked the bot
-- `"group chat was upgraded"` - Use new supergroup ID (starts with -100)
 
 ### Rate Limiting Issues
 
@@ -118,7 +113,7 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 
 **Check:** State file timestamp
 ```bash
-cat /var/lib/alerts/.rate_limit_your_alert_type
+cat /var/lib/alerts/.last_alert_YOUR_ALERT_TYPE
 # Shows Unix timestamp of last alert
 ```
 
@@ -126,7 +121,8 @@ cat /var/lib/alerts/.rate_limit_your_alert_type
 
 1. Clear rate limit:
    ```bash
-   rm /var/lib/alerts/.rate_limit_your_alert_type
+   clear_rate_limit "YOUR_ALERT_TYPE"
+   # or: rm /var/lib/alerts/.last_alert_YOUR_ALERT_TYPE
    ```
 
 2. Reduce cooldown:
@@ -136,7 +132,7 @@ cat /var/lib/alerts/.rate_limit_your_alert_type
 
 3. Use different alert type:
    ```bash
-   send_telegram_alert "disk_warning_v2" "..."
+   send_alert "DISK_WARNING_V2" "..."
    ```
 
 ### State Directory Permission Denied
@@ -347,7 +343,7 @@ echo "${DEVICE_DETECTION_LOADED:-not loaded}"
 # Check jq (for smart-alerts, JSON logging)
 command -v jq && jq --version
 
-# Check curl (for Telegram)
+# Check curl (for webhook alerts)
 command -v curl && curl --version | head -1
 
 # Check systemd tools
@@ -376,7 +372,7 @@ source smart-alerts.sh     # Requires: alerts.sh
 |---------|-------|-----|
 | `logging.sh not found` | error-handling.sh can't find logging.sh | Ensure both in same directory |
 | `jq: command not found` | smart-alerts.sh requires jq | Install jq: `apt install jq` |
-| `TELEGRAM_BOT_TOKEN not configured` | Token not set | Export TELEGRAM_BOT_TOKEN |
+| `ALERT_WEBHOOK_URL not configured` | Webhook URL not set | Export ALERT_WEBHOOK_URL |
 | `Rate limited: Skipping alert` | Same alert sent recently | Wait for cooldown or clear state |
 | `Failed to create directory` | No write permission | Check STATE_DIR permissions |
 

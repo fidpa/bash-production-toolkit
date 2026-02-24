@@ -1,4 +1,4 @@
-# Backup Safety Library
+# Backup Safety Library (v1.1.0)
 
 ## Overview
 

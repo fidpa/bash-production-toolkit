@@ -31,11 +31,11 @@ Foundation libraries provide essential functionality for production-grade Bash s
 **Key Functions**:
 ```bash
 log_info "message"              # Info level logging
-log_error "message"             # Error level logging
-log_success "message"           # Success level logging
+log_notice "message"            # Notice level (significant events)
 log_warn "message"              # Warning level logging
+log_error "message"             # Error level logging
+log_critical "message"          # Critical level (immediate action)
 log_debug "message"             # Debug level logging
-log_with_context "tag" "msg"    # Contextual logging
 ```
 
 **Documentation**: [LOGGING.md](../../docs/foundation/LOGGING.md)
