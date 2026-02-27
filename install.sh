@@ -19,7 +19,7 @@ log() {
 }
 
 warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*" >&2
+    echo -e "${YELLOW}[WARNING]${NC} $*" >&2
 }
 
 error() {

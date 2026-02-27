@@ -66,7 +66,7 @@ fi
 # COMPATIBILITY ALIASES
 # ============================================================================
 # These aliases are maintained for backwards compatibility with calling scripts.
-# The actual implementations are provided by logging.sh (log_warn, log_error).
+# The actual implementations are provided by logging.sh (log_warning, log_error).
 # No additional code needed - this section documents the compatibility layer.
 
 # ============================================================================
@@ -323,7 +323,7 @@ check_container_health() {
             log_info "Container $container is healthy"
             ;;
         "unhealthy")
-            log_warn "Container $container is unhealthy"
+            log_warning "Container $container is unhealthy"
             ((WARNING_COUNT++)) || true
             docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' "$container"
             ;;

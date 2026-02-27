@@ -170,7 +170,7 @@ case "$DEVICE" in
         enable_storage_monitoring=true
         ;;
     *)
-        log_warn "Unknown device: $DEVICE - using defaults"
+        log_warning "Unknown device: $DEVICE - using defaults"
         ;;
 esac
 ```

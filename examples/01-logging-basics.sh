@@ -27,7 +27,7 @@ echo ""
 # Log levels
 log_debug "This is a debug message"
 log_info "This is an info message"
-log_warn "This is a warning"
+log_warning "This is a warning"
 log_error "This is an error"
 
 echo ""

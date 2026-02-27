@@ -102,7 +102,7 @@ main() {
     if [[ $status -eq 0 ]]; then
         log_info "All checks passed"
     else
-        log_warn "Some checks failed"
+        log_warning "Some checks failed"
     fi
 
     return $status

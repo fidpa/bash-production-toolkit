@@ -128,7 +128,7 @@ if ! declare -F log_info >/dev/null 2>&1; then
     log_info() { echo "[INFO] $*"; }
     log_error() { echo "[ERROR] $*" >&2; }
     log_debug() { :; }
-    log_warn() { echo "[WARN] $*" >&2; }
+    log_warning() { echo "[WARNING] $*" >&2; }
 fi
 
 # ============================================================================
@@ -345,7 +345,7 @@ _sa_send_pending_alert() {
     if declare -F send_alert &>/dev/null; then
         send_alert "${event_type}_${identifier}" "$message"
     else
-        log_warn "Alert: $message"
+        log_warning "Alert: $message"
     fi
 
     # Mark as alerted (atomic write)

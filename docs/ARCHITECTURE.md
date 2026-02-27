@@ -282,7 +282,7 @@ log_debug "Debug (only shown if LOG_LEVEL=DEBUG)"
 Only `logging.sh` exports functions for subprocess visibility:
 
 ```bash
-export -f log_info log_error log_warn log_debug
+export -f log_info log_error log_warning log_debug
 ```
 
 Other libraries expect to be sourced in the same shell.

@@ -116,7 +116,7 @@ export SMART_ALERT_GRACE_PERIOD=300  # 5 minute grace period
 SERVICE_NAME="my-service"
 
 if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-    log_warn "Service $SERVICE_NAME is down"
+    log_warning "Service $SERVICE_NAME is down"
     # Register event - alert only fires after grace period
     sa_register_event "service_down" "$SERVICE_NAME" "Service $SERVICE_NAME is not running"
 else

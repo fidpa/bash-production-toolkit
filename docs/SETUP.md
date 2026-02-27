@@ -99,7 +99,7 @@ send_alert "SYSTEM_TEST" "Hello from bash-production-toolkit!" "🧪"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL |
+| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL |
 | `LOG_FORMAT` | `standard` | Output format: standard, json, compact |
 | `LOG_TO_JOURNAL` | `false` | Enable journald integration |
 | `LOG_TO_STDOUT` | `true` | Output to terminal |

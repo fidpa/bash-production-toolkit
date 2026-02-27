@@ -6,11 +6,11 @@
 # Advanced Logging Library
 # Version: 2.0.0 (Updated: 24.02.2026)
 # Changelog v2.0.0 (24.02.2026): 6-Level Log System (RFC 5424 aligned)
-#   - NEW: LOG_LEVEL_NOTICE=2 - Between INFO and WARN (syslog-compatible)
+#   - NEW: LOG_LEVEL_NOTICE=2 - Between INFO and WARNING (syslog-compatible)
 #   - NEW: log_notice() wrapper and notice() alias
 #   - NEW: log_notice_structured() - Structured logging for NOTICE level
 #   - NEW: detect_environment() - prod/dev/test auto-detection
-#   - CHANGED: Level values shifted: WARN=3, ERROR=4, CRITICAL=5 (was 2/3/4)
+#   - CHANGED: Level values shifted: WARNING=3, ERROR=4, CRITICAL=5 (was 2/3/4)
 #   - CHANGED: log_success() now deprecated alias for log_notice()
 #   - IMPROVED: journald priority mapping includes NOTICE (<5>=SD_NOTICE)
 #   - IMPROVED: Metrics tracking includes notice_count
@@ -21,7 +21,7 @@
 #   - DOCS: Clarified log rotation is manual (not automatic)
 # Changelog v1.1.0 (01.01.2026): Feature additions from server repo v2.9.0
 #   - NEW: time_function() - Function performance measurement
-#   - NEW: log_debug_structured(), log_warn_structured(), log_critical_structured()
+#   - NEW: log_debug_structured(), log_warning_structured(), log_critical_structured()
 #   - NEW: extract_script_version() - Auto-extract version from script headers
 #   - NEW: check_log_rotation() - Manual size-based log rotation
 # Changelog v1.0.1 (01.01.2026): Documentation + dependency improvements
@@ -32,7 +32,7 @@
 #   performance metrics, and log rotation for systemd-based Linux systems.
 #
 # Features:
-#   - 6 log levels: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL (RFC 5424 aligned)
+#   - 6 log levels: DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL (RFC 5424 aligned)
 #   - Structured logging with KEY=VALUE fields
 #   - journald integration (systemd-cat, logger)
 #   - JSON output format
@@ -94,7 +94,7 @@ fi
 readonly LOG_LEVEL_DEBUG=0
 readonly LOG_LEVEL_INFO=1
 readonly LOG_LEVEL_NOTICE=2
-readonly LOG_LEVEL_WARN=3
+readonly LOG_LEVEL_WARNING=3
 readonly LOG_LEVEL_ERROR=4
 readonly LOG_LEVEL_CRITICAL=5
 
@@ -114,7 +114,7 @@ get_log_level_value() {
         DEBUG)             echo "$LOG_LEVEL_DEBUG" ;;
         INFO)              echo "$LOG_LEVEL_INFO" ;;
         NOTICE|SUCCESS)    echo "$LOG_LEVEL_NOTICE" ;;
-        WARN|WARNING)      echo "$LOG_LEVEL_WARN" ;;
+        WARNING|WARN)      echo "$LOG_LEVEL_WARNING" ;;
         ERROR)             echo "$LOG_LEVEL_ERROR" ;;
         CRITICAL|CRIT)     echo "$LOG_LEVEL_CRITICAL" ;;
         *)                 echo "$LOG_LEVEL_INFO" ;;
@@ -231,7 +231,7 @@ log_to_journald_modern() {
         DEBUG)    priority_prefix="<7>" ;;
         INFO)     priority_prefix="<6>" ;;
         NOTICE)   priority_prefix="<5>" ;;
-        WARN)     priority_prefix="<4>" ;;
+        WARNING|WARN) priority_prefix="<4>" ;;
         ERROR)    priority_prefix="<3>" ;;
         CRITICAL) priority_prefix="<2>" ;;
         *)        priority_prefix="<6>" ;;
@@ -256,7 +256,7 @@ log_to_journald_structured() {
         DEBUG)    priority="debug" ;;
         INFO)     priority="info" ;;
         NOTICE)   priority="notice" ;;
-        WARN)     priority="warning" ;;
+        WARNING|WARN) priority="warning" ;;
         ERROR)    priority="err" ;;
         CRITICAL) priority="crit" ;;
         *)        priority="info" ;;
@@ -293,7 +293,7 @@ log_to_journald_legacy() {
         DEBUG)    priority="debug" ;;
         INFO)     priority="info" ;;
         NOTICE)   priority="notice" ;;
-        WARN)     priority="warning" ;;
+        WARNING|WARN) priority="warning" ;;
         ERROR)    priority="err" ;;
         CRITICAL) priority="crit" ;;
         *)        priority="info" ;;
@@ -410,7 +410,7 @@ log_structured() {
     ((SCRIPT_METRICS[log_count]++)) || true
     case "$level" in
         ERROR|CRITICAL) ((SCRIPT_METRICS[error_count]++)) || true ;;
-        WARN|WARNING)   ((SCRIPT_METRICS[warning_count]++)) || true ;;
+        WARNING|WARN)   ((SCRIPT_METRICS[warning_count]++)) || true ;;
         NOTICE)         ((SCRIPT_METRICS[notice_count]++)) || true ;;
     esac
 
@@ -573,7 +573,7 @@ rotate_log() {
 #    log_debug()     DEBUG=0    Diagnostic details
 #    log_info()      INFO=1     Normal operations
 #    log_notice()    NOTICE=2   Significant events (service started, task complete)
-#    log_warn()      WARN=3     Warnings, degraded state
+#    log_warning()      WARNING=3     Warnings, degraded state
 #    log_error()     ERROR=4    Errors, failed operations
 #    log_critical()  CRITICAL=5 Fatal errors, immediate action required
 #
@@ -582,7 +582,7 @@ rotate_log() {
 #    log_notice_structured()
 #    log_error_structured()
 #    log_debug_structured()
-#    log_warn_structured()
+#    log_warning_structured()
 #    log_critical_structured()
 #
 # 3. PERFORMANCE
@@ -601,7 +601,7 @@ rotate_log() {
 log_debug()    { log_structured "DEBUG"    "$@"; }
 log_info()     { log_structured "INFO"     "$@"; }
 log_notice()   { log_structured "NOTICE"   "$@"; }
-log_warn()     { log_structured "WARN"     "$@"; }
+log_warning()     { log_structured "WARNING"     "$@"; }
 log_error()    { log_structured "ERROR"    "$@"; }
 log_critical() { log_structured "CRITICAL" "$@"; }
 
@@ -615,7 +615,7 @@ log() {
         return 0
     fi
 
-    if [[ "$1" =~ ^(DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|CRITICAL)$ ]]; then
+    if [[ "$1" =~ ^(DEBUG|INFO|NOTICE|WARNING|WARN|ERROR|CRITICAL)$ ]]; then
         log_structured "$@"
     else
         log_structured "INFO" "$@"
@@ -625,8 +625,8 @@ log() {
 # Aliases
 info()     { log_info     "$@"; }
 notice()   { log_notice   "$@"; }
-warn()     { log_warn     "$@"; }
-warning()  { log_warn     "$@"; }
+warn()     { log_warning     "$@"; }
+warning()  { log_warning     "$@"; }
 error()    { log_error    "$@"; }
 debug()    { log_debug    "$@"; }
 critical() { log_critical "$@"; }
@@ -675,7 +675,7 @@ time_function() {
 
 # Structured logging variants
 log_debug_structured()    { log_structured "DEBUG"    "$@"; }
-log_warn_structured()     { log_structured "WARN"     "$@"; }
+log_warning_structured()     { log_structured "WARNING"     "$@"; }
 log_critical_structured() { log_structured "CRITICAL" "$@"; }
 
 # Extract script version from file header
@@ -715,7 +715,7 @@ check_log_rotation() {
     return 0
 }
 
-export -f log_structured log_json json_escape log_debug log_info log_notice log_warn log_error log_critical time_function check_log_rotation extract_script_version
-export -f log_with_fallback log_to_file log_debug_structured log_notice_structured log_warn_structured log_error_structured log_critical_structured
+export -f log_structured log_json json_escape log_debug log_info log_notice log_warning log_error log_critical time_function check_log_rotation extract_script_version
+export -f log_with_fallback log_to_file log_debug_structured log_notice_structured log_warning_structured log_error_structured log_critical_structured
 export -f log info notice warn warning error debug critical success failure log_success
 export -f detect_environment

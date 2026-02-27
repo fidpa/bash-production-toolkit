@@ -35,7 +35,7 @@ export LOG_TO_JOURNAL="true"
 
 log_info "Application started"
 log_notice "Service ready and accepting connections"  # Significant positive event
-log_warn "Configuration not found, using defaults"
+log_warning "Configuration not found, using defaults"
 log_error "Failed to connect to database"
 log_critical "Data corruption detected, halting"
 ```
@@ -65,9 +65,9 @@ Log an INFO level message with optional KEY=VALUE context.
 log_info "User logged in" "USER=alice" "IP=192.168.1.100"
 ```
 
-#### log_warn
+#### log_warning
 ```bash
-log_warn "message" [context...]
+log_warning "message" [context...]
 ```
 Log a WARNING level message.
 
@@ -118,7 +118,7 @@ log_info_structured "Failover completed" \
     "DURATION_MS=234"
 ```
 
-Similar functions: `log_notice_structured`, `log_error_structured`, `log_warn_structured`, `log_debug_structured`, `log_critical_structured`
+Similar functions: `log_notice_structured`, `log_error_structured`, `log_warning_structured`, `log_debug_structured`, `log_critical_structured`
 
 ### JSON Logging
 
@@ -140,7 +140,7 @@ For backward compatibility:
 - `log()` - Generic log (auto-detects level from message prefix)
 - `info()` - Alias for log_info
 - `notice()` - Alias for log_notice
-- `warn()` / `warning()` - Alias for log_warn
+- `warn()` / `warning()` - Alias for log_warning
 - `error()` - Alias for log_error
 - `debug()` - Alias for log_debug
 - `critical()` - Alias for log_critical
@@ -163,7 +163,7 @@ Escape a string for safe JSON embedding.
 
 #### get_log_level_value
 ```bash
-value=$(get_log_level_value "WARN")  # Returns 3
+value=$(get_log_level_value "WARNING")  # Returns 3
 ```
 Convert level string to numeric value for comparison.
 
@@ -173,7 +173,7 @@ Convert level string to numeric value for comparison.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARN, ERROR, CRITICAL |
+| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL |
 | `LOG_FORMAT` | `standard` | Output format: standard, json, compact |
 | `LOG_TO_JOURNAL` | `false` | Enable journald integration |
 | `LOG_TO_STDOUT` | `true` | Output to terminal |
@@ -193,7 +193,7 @@ Convert level string to numeric value for comparison.
 | DEBUG | 0 | debug (7) | Detailed debugging information |
 | INFO | 1 | informational (6) | General operational messages |
 | NOTICE | 2 | notice (5) | Significant events, milestones |
-| WARN | 3 | warning (4) | Warning conditions, degraded state |
+| WARNING | 3 | warning (4) | Warning conditions, degraded state |
 | ERROR | 4 | error (3) | Error conditions, failed operations |
 | CRITICAL | 5 | critical (2) | Critical failures, immediate action required |
 
@@ -204,10 +204,10 @@ Convert level string to numeric value for comparison.
 ### Level Filtering
 
 ```bash
-export LOG_LEVEL="WARN"  # Only WARN, ERROR, CRITICAL will be logged
+export LOG_LEVEL="WARNING"  # Only WARNING, ERROR, CRITICAL will be logged
 log_debug "This won't appear"
 log_info "This won't appear"
-log_warn "This will appear"
+log_warning "This will appear"
 log_error "This will appear"
 ```
 
@@ -323,9 +323,9 @@ log_success "message"
 ```
 Log SUCCESS message with ✅ emoji.
 
-### log_warn
+### log_warning
 ```bash
-log_warn "message"
+log_warning "message"
 ```
 Log WARNING message with ⚠️ emoji.
 
@@ -348,7 +348,7 @@ Log DEBUG message with 🔍 emoji. Only shown when `LOG_LEVEL=DEBUG`.
 | `SCRIPT_NAME` | basename of script | Script identifier |
 | `LOG_FILE` | `~/.cache/bash-toolkit/${SCRIPT_NAME}.log` | Log file path |
 | `LOG_TAG` | `${SCRIPT_NAME}` | Tag for syslog |
-| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, WARN, ERROR |
+| `LOG_LEVEL` | `INFO` | Minimum level: DEBUG, INFO, WARNING, ERROR |
 
 ## Examples
 

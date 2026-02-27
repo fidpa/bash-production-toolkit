@@ -22,7 +22,7 @@
 #   log_info "Processing file"
 #   log_success "Task completed"
 #   log_error "Connection failed"
-#   log_warn "Deprecated API used"
+#   log_warning "Deprecated API used"
 #   log_debug "Variable X=$X"
 #
 # Dependencies:
@@ -187,15 +187,15 @@ log_error() {
     return 0
 }
 
-log_warn() {
-    should_log "WARN" || return 0
+log_warning() {
+    should_log "WARNING" || return 0
 
     local message="$*"
-    [[ -z "$message" ]] && { echo "Warning: log_warn called without message" >&2; return 1; }
+    [[ -z "$message" ]] && { echo "Warning: log_warning called without message" >&2; return 1; }
 
     echo "⚠️  ${message}" >&2
 
-    sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [WARN] ${message}" || {
+    sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
         return 1
     }

@@ -32,7 +32,7 @@ Foundation libraries provide essential functionality for production-grade Bash s
 ```bash
 log_info "message"              # Info level logging
 log_notice "message"            # Notice level (significant events)
-log_warn "message"              # Warning level logging
+log_warning "message"              # Warning level logging
 log_error "message"             # Error level logging
 log_critical "message"          # Critical level (immediate action)
 log_debug "message"             # Debug level logging
@@ -133,7 +133,7 @@ fi
 
 # Use error handling
 if ! docker start my_container; then
-    log_warn "Container failed to start, attempting recovery..."
+    log_warning "Container failed to start, attempting recovery..."
     handle_docker_error "my_container"
 fi
 ```
