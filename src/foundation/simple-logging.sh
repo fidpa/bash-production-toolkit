@@ -4,7 +4,7 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Simple Logging Library
-# Version: 1.0.0
+# Version: 1.1.0
 #
 # Purpose:
 #   Lightweight logging for hooks and automated tasks with file + terminal output.
@@ -146,7 +146,7 @@ log_info() {
 
     sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [INFO] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
-        return 1
+        return 0
     }
 
     logger -t "${LOG_TAG}" "${message}" 2>/dev/null || true
@@ -163,7 +163,7 @@ log_success() {
 
     sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
-        return 1
+        return 0
     }
 
     logger -t "${LOG_TAG}" "${message}" 2>/dev/null || true
@@ -180,7 +180,7 @@ log_error() {
 
     sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
-        return 1
+        return 0
     }
 
     logger -t "${LOG_TAG}" -p user.error "${message}" 2>/dev/null || true
@@ -197,7 +197,7 @@ log_warning() {
 
     sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
-        return 1
+        return 0
     }
 
     logger -t "${LOG_TAG}" -p user.warning "${message}" 2>/dev/null || true
@@ -214,7 +214,7 @@ log_debug() {
 
     sfu_append_line "${LOG_FILE}" "$(date '+%Y-%m-%d %H:%M:%S') [DEBUG] ${message}" || {
         echo "Warning: Failed to write to log file" >&2
-        return 1
+        return 0
     }
 
     logger -t "${LOG_TAG}" "DEBUG: ${message}" 2>/dev/null || true

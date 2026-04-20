@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-04-20
+
+### Fixed
+- `simple-logging.sh`: Log functions (`log_info`, `log_success`, `log_error`, `log_warning`, `log_debug`) no longer return exit code 1 when the log file is not writable. Logging is best-effort — a missing or unwritable log file must not abort callers using `set -euo pipefail`.
+
+## [2.1.0] - 2026-02-27
+
+### Changed
+- Version references updated across docs, examples, and install.sh
+
 ## [2.0.0] - 2026-02-24
 
 ### Added
