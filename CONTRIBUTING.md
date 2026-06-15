@@ -72,6 +72,9 @@ Feature requests are welcome! Please use the feature request template and provid
 
    # Test examples
    bash examples/your-example.sh
+
+   # Run the test suite (same as CI)
+   bash tests/run-all.sh
    ```
 
 4. **Commit your changes** with a clear commit message:

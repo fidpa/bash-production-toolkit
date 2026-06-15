@@ -1,12 +1,12 @@
 # Bash Production Toolkit
 
-![CI](https://github.com/fidpa/bash-production-toolkit/actions/workflows/lint.yml/badge.svg)
+![CI](https://github.com/fidpa/bash-production-toolkit/actions/workflows/ci.yml/badge.svg)
 ![ShellCheck](https://img.shields.io/badge/ShellCheck-passing-brightgreen?logo=gnu-bash)
 ![Release](https://img.shields.io/github/v/release/fidpa/bash-production-toolkit)
 ![Maintained](https://img.shields.io/badge/Maintained-yes-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Bash 4.0+](https://img.shields.io/badge/Bash-4.0%2B-blue?logo=gnu-bash)
-![Libraries](https://img.shields.io/badge/Libraries-9-orange)
+![Libraries](https://img.shields.io/badge/Libraries-10-orange)
 ![Last Commit](https://img.shields.io/github/last-commit/fidpa/bash-production-toolkit)
 
 Production-ready Bash libraries for logging, file operations, error handling, alerting, and system detection.
@@ -19,6 +19,7 @@ Production-ready Bash libraries for logging, file operations, error handling, al
 - **Alert System** - Generic webhook alerts (Mattermost/Slack/Discord) with rate limiting
 - **Device Detection** - Multi-device support with architecture detection
 - **Path Utilities** - Relative path calculation, markdown-aware operations
+- **Retry & Backoff** - Exponential backoff with jitter, bounded retries
 
 ## Quick Start
 
@@ -74,6 +75,7 @@ source "${TOOLKIT}/foundation/logging.sh"
 | [backup-safety.sh](docs/utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks |
 | [device-detection.sh](docs/utilities/DEVICE_DETECTION.md) | Multi-device identification and routing |
 | [path-calculator.sh](docs/utilities/PATH_CALCULATOR.md) | Path manipulation for documentation tools |
+| [retry.sh](docs/utilities/RETRY.md) | Exponential backoff and bounded retry for unreliable operations |
 
 ## Requirements
 
@@ -103,7 +105,20 @@ See the [examples/](examples/) directory for ready-to-run scripts:
 ./examples/01-logging-basics.sh
 ./examples/02-file-operations.sh
 ./examples/03-webhook-alerts.sh
+./examples/07-self-healing-daemon.sh   # resilient supervise loop (retry + lock + alerts)
 ```
+
+## Testing
+
+The repository ships a dependency-free test suite (pure Bash, no `bats`):
+
+```bash
+bash tests/run-all.sh
+```
+
+It runs unit tests for `retry.sh` and a smoke test that executes the
+dependency-free examples. CI (`ci.yml`) runs ShellCheck, a Bash syntax check,
+and this suite on every push and pull request.
 
 ## Contributing
 

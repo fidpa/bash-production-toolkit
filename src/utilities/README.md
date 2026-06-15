@@ -2,7 +2,7 @@
 
 ## ⚡ TL;DR
 
-Helper libraries for specialized tasks: backup-safety.sh (mountpoint validation, target checks), device-detection.sh (multi-device routing, hostname-based), path-calculator.sh (relative paths for markdown links). Domain-specific utilities for production scripts.
+Helper libraries for specialized tasks: backup-safety.sh (mountpoint validation, target checks), device-detection.sh (multi-device routing, hostname-based), path-calculator.sh (relative paths for markdown links), retry.sh (exponential backoff, bounded retry). Domain-specific utilities for production scripts.
 
 ---
 
@@ -13,6 +13,7 @@ Utility libraries provide specialized helper functions for production systems:
 - **Backup Safety** - Validate backup targets, prevent data loss
 - **Device Detection** - Multi-device support with hostname-based routing
 - **Path Utilities** - Relative path calculation for documentation tools
+- **Retry & Backoff** - Resilient retries for unreliable operations
 
 ## Libraries
 
@@ -93,6 +94,33 @@ normalize_path "path"                           # Normalize path (remove .., .)
 ```
 
 **Documentation**: [PATH_CALCULATOR.md](../../docs/utilities/PATH_CALCULATOR.md)
+
+---
+
+### retry.sh
+
+**Purpose**: Resilient retry primitives for unreliable operations
+
+**Key Features**:
+- Exponential backoff (`base * 2^attempt`), capped, overflow-safe
+- Optional jitter to avoid thundering-herd retry storms
+- Bounded retry wrapper that propagates the command's exit code
+- Optional logging.sh integration (plain-echo fallback)
+
+**Key Functions**:
+```bash
+calculate_backoff "attempt"                     # Delay (s) for an attempt number
+retry_with_backoff "max_attempts" cmd [args...] # Retry cmd until success/exhausted
+```
+
+**Configuration**:
+```bash
+RETRY_BASE_DELAY=1    # Base delay in seconds
+RETRY_MAX_DELAY=60    # Maximum delay cap
+RETRY_JITTER=0        # Max random jitter added (0 = off)
+```
+
+**Documentation**: [RETRY.md](../../docs/utilities/RETRY.md)
 
 ## Usage Examples
 
@@ -198,6 +226,28 @@ MARKDOWN_LINK="[Setup Guide]($RELATIVE_PATH)"
 echo "Markdown link: $MARKDOWN_LINK"
 ```
 
+### Retry with Backoff
+
+```bash
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Source utility libraries
+TOOLKIT="/path/to/bash-production-toolkit/src"
+source "${TOOLKIT}/foundation/logging.sh"
+source "${TOOLKIT}/utilities/retry.sh"
+
+export RETRY_BASE_DELAY=2 RETRY_MAX_DELAY=60 RETRY_JITTER=5
+
+# Wait for a dependency to come up (bounded retry)
+if retry_with_backoff 8 pg_isready -h db.internal; then
+    log_info "Database reachable"
+else
+    log_error "Database still down after 8 attempts"
+    exit 1
+fi
+```
+
 ## Requirements
 
 - **Bash 4.0+** - All libraries require Bash 4.0 or higher
@@ -210,6 +260,7 @@ echo "Markdown link: $MARKDOWN_LINK"
 2. **Use device detection for multi-host scripts** - Avoid hardcoded paths
 3. **Cache device detection results** - Call once per script execution
 4. **Normalize paths before comparison** - Use `normalize_path()` for reliable comparisons
+5. **Add jitter when many clients retry** - Set `RETRY_JITTER>0` to avoid retry storms
 
 ## See Also
 

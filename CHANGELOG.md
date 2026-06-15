@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-06-15
+
+### Added
+- `retry.sh` (utilities) — resilient retry primitives:
+  - `calculate_backoff()` — exponential backoff (`base * 2^attempt`), capped, with optional jitter; overflow-safe bounded loop instead of the `**` operator
+  - `retry_with_backoff()` — bounded retry wrapper that propagates the command's exit code
+  - Optional `logging.sh` integration (plain-echo fallback); config via `RETRY_BASE_DELAY`, `RETRY_MAX_DELAY`, `RETRY_JITTER`
+- `examples/07-self-healing-daemon.sh` — crash-resilient supervise loop combining retry, logging, secure-file-utils (single-instance lock) and alerts, with an optional precondition gate
+- `docs/utilities/RETRY.md` — API reference, configuration, and usage patterns
+- `tests/` — dependency-free test suite (pure Bash, no `bats`): `lib/assert.sh` helpers, `test-retry.sh` (unit tests for retry.sh), `smoke-examples.sh` (runs dependency-free examples), `run-all.sh` runner
+
+### Changed
+- CI: consolidated `lint.yml` into `ci.yml` (ShellCheck + Bash syntax + test suite); ShellCheck/syntax checks now also cover `tests/`. README CI badge points to `ci.yml`.
+
 ## [2.2.0] - 2026-04-20
 
 ### Fixed
@@ -93,7 +107,10 @@ send_alert "BACKUP_FAILED" "Disk full"
 - Comprehensive documentation (12 docs)
 - CI/CD pipeline with ShellCheck linting
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/fidpa/bash-production-toolkit/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/fidpa/bash-production-toolkit/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/fidpa/bash-production-toolkit/releases/tag/v1.0.0

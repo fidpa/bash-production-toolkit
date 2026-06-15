@@ -41,6 +41,7 @@ This document describes the design patterns, dependencies, and conventions used 
 | **smart-alerts.sh** | jq, alerts.sh | logging.sh, secure-file-utils.sh |
 | **device-detection.sh** | (none) | yq |
 | **path-calculator.sh** | (none) | logging.sh |
+| **retry.sh** | (none) | logging.sh |
 
 ## Include Guard Pattern
 
@@ -72,6 +73,7 @@ source /path/to/error-handling.sh  # Also sources logging.sh internally
 | smart-alerts.sh | `SMART_ALERTS_LOADED` |
 | device-detection.sh | `DEVICE_DETECTION_LOADED` |
 | path-calculator.sh | `PATH_CALCULATOR_LOADED` |
+| retry.sh | `RETRY_LOADED` |
 
 ## Error Handling Philosophy
 

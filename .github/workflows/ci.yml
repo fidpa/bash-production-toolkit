@@ -1,4 +1,4 @@
-name: Lint
+name: CI
 
 on:
   push:
@@ -14,13 +14,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run ShellCheck on src/
+      - name: Run ShellCheck
         run: |
-          find src -name "*.sh" -print0 | xargs -0 shellcheck --severity=error
-
-      - name: Run ShellCheck on examples/
-        run: |
-          find examples -name "*.sh" -print0 | xargs -0 shellcheck --severity=error
+          find src examples tests -name "*.sh" -print0 | xargs -0 shellcheck --severity=error
 
   syntax-check:
     name: Bash Syntax
@@ -31,4 +27,14 @@ jobs:
 
       - name: Validate Bash syntax
         run: |
-          find src examples -name "*.sh" -print0 | xargs -0 -I {} bash -n {}
+          find src examples tests -name "*.sh" -print0 | xargs -0 -I {} bash -n {}
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run test suite
+        run: bash tests/run-all.sh

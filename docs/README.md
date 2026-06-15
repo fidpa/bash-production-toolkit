@@ -2,7 +2,7 @@
 
 ## ⚡ TL;DR
 
-9 production-ready Bash libraries: logging.sh (journald/JSON, 6-level), secure-file-utils.sh (atomic writes), alerts.sh (webhook alerts, rate-limited), device-detection.sh (multi-host). Source what you need, use immediately.
+10 production-ready Bash libraries: logging.sh (journald/JSON, 6-level), secure-file-utils.sh (atomic writes), alerts.sh (webhook alerts, rate-limited), device-detection.sh (multi-host), retry.sh (exponential backoff). Source what you need, use immediately.
 
 ---
 
@@ -52,6 +52,7 @@ source "${TOOLKIT_DIR}/foundation/logging.sh"
 | [device-detection.sh](utilities/DEVICE_DETECTION.md) | Multi-device detection | Scripts running on multiple hosts |
 | [backup-safety.sh](utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks | Backup scripts |
 | [path-calculator.sh](utilities/PATH_CALCULATOR.md) | Path utilities for documentation | Link validation, markdown tools |
+| [retry.sh](utilities/RETRY.md) | Exponential backoff and bounded retry | Network calls, reconnect loops, flaky commands |
 
 ## Library Selection Guide
 
@@ -84,6 +85,9 @@ source "${TOOLKIT_DIR}/foundation/logging.sh"
 **Calculate relative paths between files**
 → Use [path-calculator.sh](utilities/PATH_CALCULATOR.md)
 
+**Retry a flaky command or keep a connection alive**
+→ Use [retry.sh](utilities/RETRY.md) with exponential backoff
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for:
@@ -105,8 +109,10 @@ src/
 │   ├── alerts.sh         # Webhook alerts (v2.0.0)
 │   └── smart-alerts.sh   # Event tracking (v2.0.0)
 └── utilities/            # Helper libraries
+    ├── backup-safety.sh      # Backup target validation (v1.0.0)
     ├── device-detection.sh   # Device detection (v1.0.0)
-    └── path-calculator.sh    # Path utilities (v1.0.0)
+    ├── path-calculator.sh    # Path utilities (v1.0.0)
+    └── retry.sh              # Retry & backoff (v1.0.0)
 ```
 
 ## Requirements
@@ -146,6 +152,8 @@ MIT License - See [LICENSE](../LICENSE) for details.
 ### Utility Libraries
 - [DEVICE_DETECTION.md](utilities/DEVICE_DETECTION.md) - Multi-device detection
 - [PATH_CALCULATOR.md](utilities/PATH_CALCULATOR.md) - Path calculation utilities
+- [BACKUP_SAFETY.md](utilities/BACKUP_SAFETY.md) - Backup target validation
+- [RETRY.md](utilities/RETRY.md) - Retry & backoff utilities
 
 ### Examples
 - [Examples README](../examples/README.md) - Ready-to-run example scripts

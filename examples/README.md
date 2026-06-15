@@ -23,6 +23,7 @@ export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
 | `04-device-detection.sh` | Device detection, architecture, conditional execution | logging.sh, device-detection.sh |
 | `05-error-handling.sh` | Error handlers, safe execution, recovery | logging.sh, error-handling.sh |
 | `06-monitoring-script.sh` | Complete monitoring script | All libraries |
+| `07-self-healing-daemon.sh` | Crash-resilient supervise loop: backoff, lock, precondition gate, alerting | retry.sh, logging.sh, secure-file-utils.sh, alerts.sh |
 
 ## Running Examples
 
@@ -32,6 +33,7 @@ export ALERT_WEBHOOK_URL="https://your-webhook-endpoint/TOKEN"
 ./examples/02-file-operations.sh
 ./examples/04-device-detection.sh
 ./examples/05-error-handling.sh
+./examples/07-self-healing-daemon.sh   # runs a bundled demo workload; ALERT_WEBHOOK_URL optional
 
 # Alerting examples (require webhook URL)
 export ALERT_WEBHOOK_URL="https://your-webhook/TOKEN"

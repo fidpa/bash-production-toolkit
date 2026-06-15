@@ -2,7 +2,7 @@
 
 ## ⚡ TL;DR
 
-9 production-ready Bash libraries organized in 3 categories: foundation (logging, file utils, error handling), monitoring (alerts, smart-alerts), utilities (device detection, path calculation, backup safety). Source individually or use init.sh.
+10 production-ready Bash libraries organized in 3 categories: foundation (logging, file utils, error handling), monitoring (alerts, smart-alerts), utilities (device detection, path calculation, backup safety, retry/backoff). Source individually or use init.sh.
 
 ---
 
@@ -14,7 +14,7 @@ All libraries are organized into three categories based on their purpose:
 |----------|-----------|---------|
 | **Foundation** | 4 libraries | Core functionality (logging, file operations, error handling) |
 | **Monitoring** | 2 libraries | Alerting and event tracking |
-| **Utilities** | 3 libraries | Helper functions (device detection, path utilities, backup validation) |
+| **Utilities** | 4 libraries | Helper functions (device detection, path utilities, backup validation, retry/backoff) |
 
 ## Quick Reference
 
@@ -47,6 +47,7 @@ Located in `src/utilities/`:
 | [backup-safety.sh](../docs/utilities/BACKUP_SAFETY.md) | Backup target validation, mountpoint checks | `check_backup_target()`, `check_mountpoint()` |
 | [device-detection.sh](../docs/utilities/DEVICE_DETECTION.md) | Multi-device identification and routing | `detect_device()`, `on_device()` |
 | [path-calculator.sh](../docs/utilities/PATH_CALCULATOR.md) | Relative path calculation for documentation tools | `calculate_relative_path()` |
+| [retry.sh](../docs/utilities/RETRY.md) | Exponential backoff and bounded retry for unreliable operations | `retry_with_backoff()`, `calculate_backoff()` |
 
 ## Usage
 
