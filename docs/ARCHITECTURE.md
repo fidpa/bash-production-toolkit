@@ -80,7 +80,8 @@ source /path/to/error-handling.sh  # Also sources logging.sh internally
 ### Libraries vs Scripts
 
 **Libraries** (this toolkit):
-- Use `set -uo pipefail` (NOT `-e`)
+- Set NO file-scope shell flags (`set -e`/`-u`/`-o pipefail`) — a sourced library must not change the caller's shell options
+- Written to be `set -u` clean, so they load safely under any caller flags
 - Return error codes instead of exiting
 - Never call `exit` directly
 - Provide error messages via dedicated error functions

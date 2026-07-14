@@ -4,7 +4,7 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Secure File Utilities Library
-# Version: 1.0.0
+# Version: 1.1.0
 #
 # Purpose:
 #   Prevent Bash variable-substitution security vulnerabilities through
@@ -34,13 +34,18 @@
 #   TMPDIR          - Custom temp directory (default: /tmp)
 #
 # Error Handling:
-#   Libraries use set -uo pipefail (no -e) for explicit error handling.
+#   No set -e/-u/pipefail at file scope - a sourced library must not change
+#   the caller's shell options (this file is written to be set -u clean).
 #   All functions return exit codes - caller handles errors.
 #
 # Changelog:
+#   v1.1.0 (2026-07-15): Removed file-scope set -uo pipefail - a sourced library
+#     must not change the caller's shell options (leaked via logging.sh and
+#     simple-logging.sh into every caller)
 #   v1.0.0 (2026-01-01): Initial public release
 
-set -uo pipefail  # No -e: Using explicit error handling
+# NOTE: No set -e/-u/pipefail here - a sourced library must not change the
+# caller's shell options (this file is written to be set -u clean)
 
 # ============================================================================
 # INCLUDE GUARD

@@ -4,7 +4,20 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Advanced Logging Library
-# Version: 2.0.0 (Updated: 24.02.2026)
+# Version: 2.1.0 (Updated: 15.07.2026)
+# Changelog v2.1.0 (15.07.2026): Robustness fixes (ported from server repo review)
+#   - FIX: Removed INT/TERM trap - a trap without re-raise made sourcing scripts
+#     SURVIVE SIGTERM/SIGINT (systemd stop then needs SIGKILL after TimeoutStopSec)
+#   - FIX: Removed ORIGINAL_PWD machinery - the library only changes directory
+#     in subshells, the caller's working directory never needs restoring
+#   - FIX: ERROR/CRITICAL now always logged regardless of LOG_LEVEL (matches
+#     log_error_structured semantics)
+#   - FIX: Exported functions work in fresh child shells (get_log_level_value and
+#     log_info_structured were missing from export -f; config variables exported)
+#   - FIX: Zero-arg calls (log_info $empty_var) no longer kill set -u callers
+#   - FIX: No trailing space in log lines when no context fields are given
+#   - FIX: log_to_journald_legacy() closes stdin (prevents journald hang)
+#   - NEW: Warning when loaded together with simple-logging.sh (name collision)
 # Changelog v2.0.0 (24.02.2026): 6-Level Log System (RFC 5424 aligned)
 #   - NEW: LOG_LEVEL_NOTICE=2 - Between INFO and WARNING (syslog-compatible)
 #   - NEW: log_notice() wrapper and notice() alias
@@ -69,16 +82,19 @@ if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
 fi
 readonly _LOGGING_LOADED="true"
 
-# Working directory protection
-# shellcheck disable=SC2155
-ORIGINAL_PWD="$(pwd)"
-readonly ORIGINAL_PWD
+# simple-logging.sh defines log_* functions with different semantics - loading
+# both in one shell silently redefines them (last one sourced wins)
+if [[ "${_SIMPLE_LOGGING_LOADED:-}" == "true" ]]; then
+    echo "WARNING: logging.sh loaded after simple-logging.sh - log_* functions are being redefined" >&2
+fi
 
 # shellcheck disable=SC2155
 _LOGGING_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly _LOGGING_LIB_DIR
 
-trap 'cd "$ORIGINAL_PWD" 2>/dev/null || true' INT TERM
+# NOTE: No INT/TERM trap here - a trap without re-raise makes callers survive
+# SIGTERM/SIGINT (systemd stop then needs SIGKILL after TimeoutStopSec). The
+# library only changes directory in subshells, so nothing needs restoring.
 
 # Load secure file utilities if available
 if [[ -f "${_LOGGING_LIB_DIR}/secure-file-utils.sh" ]]; then
@@ -109,7 +125,8 @@ readonly LOG_LEVEL_CRITICAL=5
 
 # Convert log level string to numeric
 get_log_level_value() {
-    local level="${1^^}"
+    local level="${1-}"
+    level="${level^^}"
     case "$level" in
         DEBUG)             echo "$LOG_LEVEL_DEBUG" ;;
         INFO)              echo "$LOG_LEVEL_INFO" ;;
@@ -300,7 +317,8 @@ log_to_journald_legacy() {
     esac
 
     if command -v logger &>/dev/null; then
-        logger -t "${SCRIPT_NAME:-script}" -p "daemon.$priority" "$message"
+        # Close stdin to prevent journald hanging (same fix as structured variant)
+        logger -t "${SCRIPT_NAME:-script}" -p "daemon.$priority" "$message" </dev/null 2>/dev/null
         return 0
     fi
     return 1
@@ -396,54 +414,64 @@ log_json() {
 # ============================================================================
 
 log_structured() {
-    local level="$1"
-    shift
-    local message="$1"
-    shift
+    # Defensive ${N-}: 'log_info $var' with empty unquoted var passes zero args -
+    # a bare $1 would kill set -u callers (unbound variable is fatal)
+    local level="${1:-INFO}"
+    local message="${2-}"
+    shift $(( $# >= 2 ? 2 : $# ))
 
+    # ERROR/CRITICAL always pass, matching log_error_structured semantics
     local level_value
     level_value=$(get_log_level_value "$level")
-    if [[ $level_value -lt $CURRENT_LOG_LEVEL ]]; then
+    if [[ $level_value -lt $CURRENT_LOG_LEVEL && $level_value -lt $LOG_LEVEL_ERROR ]]; then
         return 0
     fi
 
-    ((SCRIPT_METRICS[log_count]++)) || true
-    case "$level" in
-        ERROR|CRITICAL) ((SCRIPT_METRICS[error_count]++)) || true ;;
-        WARNING|WARN)   ((SCRIPT_METRICS[warning_count]++)) || true ;;
-        NOTICE)         ((SCRIPT_METRICS[notice_count]++)) || true ;;
-    esac
+    # Metrics are skipped in fresh child shells: SCRIPT_METRICS is an
+    # associative array and cannot be exported - increment would be fatal there
+    if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
+        ((SCRIPT_METRICS[log_count]++)) || true
+        case "$level" in
+            ERROR|CRITICAL) ((SCRIPT_METRICS[error_count]++)) || true ;;
+            WARNING|WARN)   ((SCRIPT_METRICS[warning_count]++)) || true ;;
+            NOTICE)         ((SCRIPT_METRICS[notice_count]++)) || true ;;
+        esac
+    fi
 
     local context=""
     while [[ $# -gt 0 ]]; do
-        context="$context $1"
+        context="${context:+$context }$1"
         shift
     done
 
-    # context is intentionally word-split here (space-separated KEY=VALUE pairs)
+    # context is intentionally word-split here (space-separated KEY=VALUE pairs);
+    # ${context:+ $context} avoids a trailing space when no fields were given
     # shellcheck disable=SC2086
     case "$LOG_FORMAT" in
         json)   log_json "$level" "$message" $context ;;
         compact)
             local timestamp
             timestamp=$(date '+%H:%M:%S')
-            echo "[$timestamp] $level: $message $context"
+            echo "[$timestamp] $level: $message${context:+ $context}"
             ;;
-        *)      log_with_fallback "$level" "$message $context" ;;
+        *)      log_with_fallback "$level" "$message${context:+ $context}" ;;
     esac
 }
 
 # Structured logging with journald fields
 log_info_structured() {
-    local message="$1"
-    shift
+    local message="${1-}"
+    shift $(( $# > 0 ? 1 : 0 ))
     local fields=("$@")
 
     if [[ $LOG_LEVEL_INFO -lt $CURRENT_LOG_LEVEL ]]; then
         return 0
     fi
 
-    ((SCRIPT_METRICS[log_count]++)) || true
+    # Metrics skipped in child shells - associative arrays are not exportable
+    if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
+        ((SCRIPT_METRICS[log_count]++)) || true
+    fi
 
     if [[ "$LOG_TO_JOURNAL" == "true" ]]; then
         log_to_journald_structured "INFO" "$message" "${fields[@]}"
@@ -459,16 +487,19 @@ log_info_structured() {
 }
 
 log_notice_structured() {
-    local message="$1"
-    shift
+    local message="${1-}"
+    shift $(( $# > 0 ? 1 : 0 ))
     local fields=("$@")
 
     if [[ $LOG_LEVEL_NOTICE -lt $CURRENT_LOG_LEVEL ]]; then
         return 0
     fi
 
-    ((SCRIPT_METRICS[log_count]++)) || true
-    ((SCRIPT_METRICS[notice_count]++)) || true
+    # Metrics skipped in child shells - associative arrays are not exportable
+    if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
+        ((SCRIPT_METRICS[log_count]++)) || true
+        ((SCRIPT_METRICS[notice_count]++)) || true
+    fi
 
     if [[ "$LOG_TO_JOURNAL" == "true" ]]; then
         log_to_journald_structured "NOTICE" "$message" "${fields[@]}"
@@ -484,12 +515,15 @@ log_notice_structured() {
 }
 
 log_error_structured() {
-    local message="$1"
-    shift
+    local message="${1-}"
+    shift $(( $# > 0 ? 1 : 0 ))
     local fields=("$@")
 
-    ((SCRIPT_METRICS[log_count]++)) || true
-    ((SCRIPT_METRICS[error_count]++)) || true
+    # Metrics skipped in child shells - associative arrays are not exportable
+    if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
+        ((SCRIPT_METRICS[log_count]++)) || true
+        ((SCRIPT_METRICS[error_count]++)) || true
+    fi
 
     if [[ "$LOG_TO_JOURNAL" == "true" ]]; then
         log_to_journald_structured "ERROR" "$message" "${fields[@]}"
@@ -522,7 +556,7 @@ log_performance() {
     perf_msg="$perf_msg | Warnings: ${SCRIPT_METRICS[warning_count]}"
     perf_msg="$perf_msg | Notices: ${SCRIPT_METRICS[notice_count]}"
 
-    local old_stdout="${LOG_TO_STDOUT}"
+    local old_stdout="${LOG_TO_STDOUT:-true}"
     LOG_TO_STDOUT=false
     log_structured "INFO" "$perf_msg"
     LOG_TO_STDOUT="$old_stdout"
@@ -637,17 +671,16 @@ failure()  { log_error    "✗ $*"; }
 # INITIALIZATION
 # ============================================================================
 
+# Replaces any EXIT trap set BEFORE sourcing; a caller trap set AFTER sourcing
+# replaces this one in turn (call log_performance in your own trap if wanted)
 _logging_exit_handler() {
     local ret=$?
     log_performance || true
-    cd "$ORIGINAL_PWD" 2>/dev/null || true
     exit "$ret"
 }
 
 if [[ "${LOG_PERFORMANCE:-true}" == "true" ]]; then
     trap '_logging_exit_handler' EXIT
-else
-    trap 'cd "$ORIGINAL_PWD" 2>/dev/null || true' EXIT
 fi
 
 # ============================================================================
@@ -715,7 +748,17 @@ check_log_rotation() {
     return 0
 }
 
-export -f log_structured log_json json_escape log_debug log_info log_notice log_warning log_error log_critical time_function check_log_rotation extract_script_version
-export -f log_with_fallback log_to_file log_debug_structured log_notice_structured log_warning_structured log_error_structured log_critical_structured
+# Export functions for use in fresh child shells (bash -c, xargs bash, ...)
+# Limitation: metrics are not tracked there (associative arrays cannot be
+# exported) - child *scripts* should source the library themselves instead
+export -f get_log_level_value log_structured log_json json_escape log_debug log_info log_notice log_warning log_error log_critical time_function check_log_rotation extract_script_version
+export -f log_with_fallback log_to_file log_to_journald_modern log_to_journald_structured log_to_journald_legacy
+export -f log_info_structured log_debug_structured log_notice_structured log_warning_structured log_error_structured log_critical_structured
 export -f log info notice warn warning error debug critical success failure log_success
 export -f detect_environment
+
+# Export configuration/context consumed by the exported functions (export on
+# readonly variables is legal - it only adds the attribute)
+export CURRENT_LOG_LEVEL LOG_LEVEL_DEBUG LOG_LEVEL_INFO LOG_LEVEL_NOTICE LOG_LEVEL_WARNING LOG_LEVEL_ERROR LOG_LEVEL_CRITICAL
+export LOG_FORMAT LOG_TO_JOURNAL LOG_TO_STDOUT LOG_DIR
+export CORRELATION_ID SCRIPT_ENV

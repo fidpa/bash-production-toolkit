@@ -1,7 +1,5 @@
-# .shellcheckrc - Pi-Router + NAS Server shellcheck config
-# Multi-Device Setup: 552 Shell-Scripts (Pi 5: ~249, NAS: ~303)
-# Best Practices 2025 compliant
-# Optimized for ShellCheck 0.9.0+ (Last reviewed: 12. Dezember 2025)
+# .shellcheckrc - Bash Production Toolkit shellcheck config
+# Optimized for ShellCheck 0.9.0+
 #
 # References:
 # - https://www.shellcheck.net/wiki/Directive
@@ -14,16 +12,16 @@
 
 # SC1090: Can't follow non-constant source
 # SC1091: Not following sourced file
-# Rationale: Scripts use dynamic library paths (e.g., ${SCRIPT_DIR}/../lib/)
-#            shellcheck cannot resolve these at static analysis time
-# Example: source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/logging.sh"
+# Rationale: Examples and tests source libraries via dynamic paths
+#            (e.g., ${TOOLKIT}/foundation/logging.sh) which shellcheck
+#            cannot resolve at static analysis time
 disable=SC1090,SC1091
 
 # ============================================================================
 # OPTIONAL CHECKS
 # ============================================================================
 
-# NOT using enable=all (Best Practice 2025)
+# NOT using enable=all
 # Reason: enable=all activates subjective/conflicting optional checks
 #         meant for discovery only, not production
 # Instead: Selectively enable specific optional checks if needed
@@ -31,23 +29,23 @@ disable=SC1090,SC1091
 # Available optional checks (use shellcheck --list-optional):
 # - avoid-nullary-conditions, deprecate-which, quote-safe-variables, etc.
 
-# No optional checks enabled (Production default)
+# No optional checks enabled (production default)
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-# Shell dialect (Raspberry Pi OS Bookworm: bash 5.2.15, Ubuntu 24.04: bash 5.2.21)
+# Shell dialect
 shell=bash
 
 # Source path for library resolution
 # SCRIPTDIR = directory of currently checked script
 source-path=SCRIPTDIR
 
-# Allow following source statements (Best Practice 2025)
-# Safely enables shellcheck to open sourced files where possible
+# Allow following source statements (safely enables shellcheck to open
+# sourced files where possible)
 external-sources=true
 
-# Minimum severity threshold (focus on errors + warnings)
-# Consistent with script-audit.sh Production-Ready threshold (85%+ clean)
-severity=warning
+# NOTE: severity= is not a valid .shellcheckrc parameter in shellcheck 0.9.0
+# (it is silently ignored). Set severity via CLI flag instead:
+#   shellcheck --severity=warning ...

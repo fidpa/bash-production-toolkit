@@ -4,7 +4,10 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Smart Alerts Library
-# Version: 2.0.0 (Updated: 24.02.2026)
+# Version: 2.1.0 (Updated: 2026-07-15)
+# Changelog v2.1.0 (2026-07-15): Library Flag Hygiene
+#   - FIX: Removed file-scope set -uo pipefail (a sourced library must not
+#     change the caller's shell options)
 # Changelog v2.0.0 (24.02.2026): Aligned with alerts.sh v2.0.0 webhook backend
 #   - BREAKING: Uses send_alert() instead of send_telegram_alert()
 #   - BREAKING: Uses send_recovery_alert() with new signature (no send_telegram_alert)
@@ -48,7 +51,8 @@
 #   SMART_ALERT_ENABLED            - Enable/disable smart alerts (default: true)
 #   ALERT_WEBHOOK_URL              - Webhook URL (passed through to alerts.sh)
 
-set -uo pipefail
+# NOTE: No set -e/-u/pipefail here - a sourced library must not change the
+# caller's shell options (this file is written to be set -u clean)
 
 # ============================================================================
 # INCLUDE GUARD

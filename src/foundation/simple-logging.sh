@@ -4,7 +4,7 @@
 # https://github.com/fidpa/bash-production-toolkit
 #
 # Simple Logging Library
-# Version: 1.1.0
+# Version: 1.2.0
 #
 # Purpose:
 #   Lightweight logging for hooks and automated tasks with file + terminal output.
@@ -44,9 +44,21 @@
 # For systemd services, use logging.sh instead (journald integration).
 #
 # Changelog:
+#   v1.2.0 (2026-07-15): Robustness fixes (ported from server repo review)
+#     - FIX: No more set -uo pipefail at file scope (a sourced library must not
+#       change the caller's shell options)
+#     - FIX: log_warning() was filtered at INFO level (WARNING did not map to WARN)
+#     - FIX: get_log_level_value renamed to _slog_get_log_level_value (collided
+#       with logging.sh's incompatible level scale when both were loaded)
+#     - FIX: Log file is created with 600 permissions (previously only chmod'ed
+#       if it already existed)
+#     - FIX: logger calls close stdin (prevents journald hang)
+#     - NEW: Warning when loaded together with logging.sh (name collision)
+#   v1.1.0 (2026-04-20): Best-effort logging - no exit 1 on unwritable log file
 #   v1.0.0 (2026-01-01): Initial public release
 
-set -uo pipefail  # No -e: Explicit error handling
+# NOTE: No set -e/-u/pipefail here - a sourced library must not change the
+# caller's shell options (this file is written to be set -u clean)
 
 # ============================================================================
 # DEPENDENCIES
@@ -70,6 +82,12 @@ if [[ "${_SIMPLE_LOGGING_LOADED:-}" == "true" ]]; then
     return 0
 fi
 readonly _SIMPLE_LOGGING_LOADED="true"
+
+# logging.sh defines log_* functions with different semantics - loading both
+# in one shell silently redefines them (last one sourced wins)
+if [[ "${_LOGGING_LOADED:-}" == "true" ]]; then
+    echo "WARNING: simple-logging.sh loaded after logging.sh - log_* functions are being redefined" >&2
+fi
 
 # ============================================================================
 # CONFIGURATION
@@ -100,34 +118,36 @@ fi
 readonly LOG_FILE="${LOG_FILE_CANDIDATE}"
 readonly LOG_DIR="${LOG_DIR_CANDIDATE}"
 
-# Secure permissions for log file
-if [[ -f "${LOG_FILE}" ]]; then
-    chmod 600 "${LOG_FILE}" 2>/dev/null || true
+# Create log file with secure permissions (owner read/write only)
+if [[ ! -f "${LOG_FILE}" ]]; then
+    (umask 077 && : > "${LOG_FILE}") 2>/dev/null || true
 fi
+chmod 600 "${LOG_FILE}" 2>/dev/null || true
 
 # ============================================================================
 # LOG LEVEL FILTERING
 # ============================================================================
 
 # Log levels: DEBUG(0) < INFO(1) < WARN(2) < ERROR(3)
-get_log_level_value() {
-    local level="$1"
+# Namespaced (_slog_): logging.sh defines get_log_level_value with a different scale
+_slog_get_log_level_value() {
+    local level="${1-}"
     case "$level" in
-        DEBUG) echo 0 ;;
-        INFO)  echo 1 ;;
-        WARN)  echo 2 ;;
-        ERROR) echo 3 ;;
-        *)     echo 1 ;;
+        DEBUG)        echo 0 ;;
+        INFO)         echo 1 ;;
+        WARN|WARNING) echo 2 ;;
+        ERROR)        echo 3 ;;
+        *)            echo 1 ;;
     esac
 }
 
-CURRENT_LEVEL=$(get_log_level_value "$LOG_LEVEL")
+CURRENT_LEVEL=$(_slog_get_log_level_value "$LOG_LEVEL")
 readonly CURRENT_LEVEL
 
 should_log() {
     local level="${1:-INFO}"
     local level_value
-    level_value=$(get_log_level_value "$level") || return 2
+    level_value=$(_slog_get_log_level_value "$level") || return 2
 
     [[ $level_value -ge $CURRENT_LEVEL ]]
 }
@@ -149,7 +169,7 @@ log_info() {
         return 0
     }
 
-    logger -t "${LOG_TAG}" "${message}" 2>/dev/null || true
+    logger -t "${LOG_TAG}" "${message}" </dev/null 2>/dev/null || true
     return 0
 }
 
@@ -166,7 +186,7 @@ log_success() {
         return 0
     }
 
-    logger -t "${LOG_TAG}" "${message}" 2>/dev/null || true
+    logger -t "${LOG_TAG}" "${message}" </dev/null 2>/dev/null || true
     return 0
 }
 
@@ -183,7 +203,7 @@ log_error() {
         return 0
     }
 
-    logger -t "${LOG_TAG}" -p user.error "${message}" 2>/dev/null || true
+    logger -t "${LOG_TAG}" -p user.error "${message}" </dev/null 2>/dev/null || true
     return 0
 }
 
@@ -200,7 +220,7 @@ log_warning() {
         return 0
     }
 
-    logger -t "${LOG_TAG}" -p user.warning "${message}" 2>/dev/null || true
+    logger -t "${LOG_TAG}" -p user.warning "${message}" </dev/null 2>/dev/null || true
     return 0
 }
 
@@ -217,7 +237,7 @@ log_debug() {
         return 0
     }
 
-    logger -t "${LOG_TAG}" "DEBUG: ${message}" 2>/dev/null || true
+    logger -t "${LOG_TAG}" "DEBUG: ${message}" </dev/null 2>/dev/null || true
     return 0
 }
 
@@ -226,5 +246,5 @@ log_debug() {
 # ============================================================================
 
 if [[ "${LOG_LEVEL}" == "DEBUG" ]]; then
-    log_debug "Simple Logging Library v1.0.0 loaded (LOG_FILE=${LOG_FILE})"
+    log_debug "Simple Logging Library loaded (LOG_FILE=${LOG_FILE})"
 fi

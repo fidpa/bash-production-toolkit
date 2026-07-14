@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-15
+
+### Fixed
+- `logging.sh` v2.1.0: Removed the INT/TERM trap — a trap without re-raise made every sourcing script **survive SIGTERM/SIGINT** (under systemd, `stop` then escalates to SIGKILL after `TimeoutStopSec`). The `ORIGINAL_PWD` restore machinery was removed with it: the library only changes directory in subshells, so the caller's working directory never needs restoring.
+- `logging.sh`: ERROR/CRITICAL messages are now always logged regardless of `LOG_LEVEL`, matching the documented `log_error_structured()` semantics.
+- `logging.sh`: Exported functions now work in fresh child shells (`bash -c`, `xargs bash`) — `get_log_level_value` and `log_info_structured` were missing from `export -f`, and the configuration variables the functions read are now exported. Metrics are skipped in child shells (associative arrays cannot be exported).
+- `logging.sh`: Zero-argument calls (e.g. `log_info $empty_var` with an unquoted empty variable) no longer kill callers running under `set -u`; log lines no longer end with a trailing space when no context fields are given; `log_to_journald_legacy()` closes stdin like the structured variant (prevents a journald hang).
+- `simple-logging.sh` v1.2.0: `log_warning()` was filtered at INFO level because `WARNING` did not map to the `WARN` level value; the log file is now created with `600` permissions instead of only being chmod'ed when it already existed; `logger` calls close stdin.
+- `simple-logging.sh` v1.2.0 / `secure-file-utils.sh` v1.1.0: Removed file-scope `set -uo pipefail` — a sourced library must not change the caller's shell options (the leak reached every caller of all three foundation libraries).
+- `smart-alerts.sh` v2.1.0: Removed file-scope `set -uo pipefail` (same flag-leak fix as the foundation libraries — with this, no library in the toolkit sets file-scope shell flags anymore). `ARCHITECTURE.md` § Error Handling Philosophy updated: libraries set no file-scope flags and are written to be `set -u` clean.
+- `simple-logging.sh`: `get_log_level_value()` renamed to `_slog_get_log_level_value()` — the name collided with `logging.sh`'s function of the same name, which uses an incompatible level scale, silently corrupting level filtering when both libraries were loaded.
+
+### Added
+- `logging.sh` / `simple-logging.sh`: Warn on stderr when both libraries are loaded in the same shell — they define the same `log_*` names with different semantics (last one sourced wins).
+
 ## [2.3.0] - 2026-06-15
 
 ### Added
@@ -107,7 +122,8 @@ send_alert "BACKUP_FAILED" "Disk full"
 - Comprehensive documentation (12 docs)
 - CI/CD pipeline with ShellCheck linting
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.0.0...v2.1.0
