@@ -186,6 +186,40 @@ Convert level string to numeric value for comparison.
 | `CORRELATION_ID` | (auto-generated) | Request tracking ID |
 | `SCRIPT_NAME` | (auto-detected) | Script identifier for logs |
 
+> **Source-time initialization**: These defaults are applied with `:=` when
+> `logging.sh` is **sourced**. Set your overrides *before* the `source` line —
+> assignments like `LOG_TO_STDOUT="${LOG_TO_STDOUT:-false}"` placed *after*
+> sourcing are dead code, because the variable is already set.
+
+### ⚠️ Pitfall: `log_*` inside command-substituted functions
+
+With `LOG_TO_STDOUT=true` (the default), every `log_*` call prints to
+**stdout**. If a function that logs is called via command substitution, the log
+line becomes part of the captured value:
+
+```bash
+get_wan_ip() {
+    local ip
+    ip=$(ip -4 -o addr show eth0 | awk '{print $4}' | cut -d/ -f1)
+    if [[ -z "$ip" ]]; then
+        log_warning "eth0 has no IP — using cached value"   # ❌ goes to stdout!
+        cat /var/cache/last-ip
+    fi
+    echo "$ip"
+}
+
+wan_ip=$(get_wan_ip)   # wan_ip now contains the WARNING line + the IP
+sed -i "s|^ip=.*|ip=${wan_ip}|" app.conf   # multi-line value breaks sed
+```
+
+The failure is latent: it only triggers when the logging branch actually runs
+(often an error path that tests never hit). In functions whose stdout is
+captured, always redirect log calls to stderr:
+
+```bash
+log_warning "eth0 has no IP — using cached value" >&2   # ✅ stdout stays clean
+```
+
 ### Log Levels (RFC 5424 aligned)
 
 | Level | Value | syslog Priority | Use For |

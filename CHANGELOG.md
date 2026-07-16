@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-07-16
+
+Documentation-only release, prompted by a field incident in a downstream
+deployment: a `log_warning` line inside a command-substituted function leaked
+into the captured value and broke a sed expression during a real WAN outage.
+
+### Added
+- `docs/foundation/LOGGING.md` / `docs/TROUBLESHOOTING.md`: Documented the command-substitution pitfall — with `LOG_TO_STDOUT=true` (default), `log_*` calls inside functions captured via `$(...)` leak the log line into the captured value (latent until the logging branch fires). Fix pattern: `log_warning "..." >&2` in captured functions. Also documented that the `:=` defaults are applied at source time, so overrides must be set *before* sourcing `logging.sh`.
+
 ## [2.4.0] - 2026-07-15
 
 ### Fixed
@@ -122,7 +131,8 @@ send_alert "BACKUP_FAILED" "Disk full"
 - Comprehensive documentation (12 docs)
 - CI/CD pipeline with ShellCheck linting
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.1...HEAD
+[2.4.1]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.1.0...v2.2.0

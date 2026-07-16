@@ -70,6 +70,31 @@ ls -la /var/log/
    sudo chown $USER:$USER /var/log/myapp.log
    ```
 
+### Captured Values Contain Log Lines
+
+**Symptoms:** A variable assigned via `var=$(some_function)` contains log
+output in addition to the expected value. Downstream commands fail in
+surprising ways — e.g. `sed: unterminated 's' command` when the multi-line
+value is interpolated into a sed expression, or string comparisons that
+mysteriously report a change.
+
+**Cause:** `LOG_TO_STDOUT` defaults to `true`, so `log_*` calls print to
+stdout — and command substitution captures stdout. The bug is latent: it only
+fires when the logging branch inside the captured function actually executes,
+which is often an error path that normal testing never reaches.
+
+**Solution:** In functions whose stdout is captured, redirect log calls to
+stderr:
+
+```bash
+log_warning "falling back to cached value" >&2
+```
+
+Also validate captured values before using them in write operations
+(`[[ "$ip" =~ ^[0-9.]+$ ]] || return 1`) — that stops any stray output from
+reaching config files. See the pitfall section in
+[foundation/LOGGING.md](foundation/LOGGING.md) for a full example.
+
 ---
 
 ## Alert Issues
