@@ -29,5 +29,9 @@ Thumbs.db
 REDDIT_POST.md
 LINKEDIN_POST.md
 
+# Local assistant configuration (never published)
+.claude/
+CLAUDE.md
+
 # Nextcloud/Rclone symlinks
 *.rclonelink

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-08-08
+
+Maintenance release. No library code changed — every version number in the
+documentation now matches the `# Version:` header of the library it describes,
+and release notes are built from this changelog instead of from commit messages.
+
+### Fixed
+- Documentation version drift across 12 references in 5 files. Six of ten
+  libraries advertised a version they had outgrown: `logging.sh` (2.0.0 → 2.1.0),
+  `simple-logging.sh` (1.0.0 → 1.2.0), `secure-file-utils.sh` (1.0.0 → 1.1.0),
+  `error-handling.sh` (1.0.0 → 1.0.1), `smart-alerts.sh` (2.0.0 → 2.1.0) and
+  `backup-safety.sh` (1.0.0 → 1.1.0). Affected: the directory tree in
+  `docs/README.md`, the dependency graph in `docs/ARCHITECTURE.md`, and the
+  heading lines of `docs/foundation/LOGGING.md`,
+  `docs/foundation/SECURE_FILE_UTILS.md` and `docs/monitoring/SMART_ALERTS.md`.
+  The library headers were correct throughout; only the documentation lagged.
+  One reference — `simple-logging.sh (v1.1.1)` in `docs/foundation/LOGGING.md` —
+  named a version that never existed: the file went from 1.0.0 (v2.1.0) straight
+  to 1.2.0 (v2.4.0). This matters for a sourced library, where the header version
+  is how a consumer decides whether the fix they need is in the copy they have.
+
+### Changed
+- `.github/workflows/release.yml`: release notes are now extracted from the
+  matching `CHANGELOG.md` section instead of generated from commit messages.
+  With this repository's bare `vX.Y.Z` commit subjects, `generate_release_notes`
+  produced release pages containing nothing but a compare link (v2.4.1: 92
+  characters) while the changelog held the actual write-up. The extraction step
+  fails the workflow on an empty result rather than publishing an empty release.
+- `.gitignore`: ignore local assistant configuration (`.claude/`, `CLAUDE.md`).
+
 ## [2.4.1] - 2026-07-16
 
 Documentation-only release, prompted by a field incident in a downstream
@@ -131,7 +161,8 @@ send_alert "BACKUP_FAILED" "Disk full"
 - Comprehensive documentation (12 docs)
 - CI/CD pipeline with ShellCheck linting
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.1...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.2...HEAD
+[2.4.2]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.2.0...v2.3.0

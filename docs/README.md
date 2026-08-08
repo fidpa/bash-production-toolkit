@@ -101,15 +101,15 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for:
 ```
 src/
 ├── foundation/           # Core libraries (no external dependencies)
-│   ├── logging.sh        # Structured logging (v2.0.0)
-│   ├── simple-logging.sh # Lightweight logging (v1.0.0)
-│   ├── secure-file-utils.sh  # Atomic file ops (v1.0.0)
-│   └── error-handling.sh # Error handlers (v1.0.0)
+│   ├── logging.sh        # Structured logging (v2.1.0)
+│   ├── simple-logging.sh # Lightweight logging (v1.2.0)
+│   ├── secure-file-utils.sh  # Atomic file ops (v1.1.0)
+│   └── error-handling.sh # Error handlers (v1.0.1)
 ├── monitoring/           # Alerting libraries
 │   ├── alerts.sh         # Webhook alerts (v2.0.0)
-│   └── smart-alerts.sh   # Event tracking (v2.0.0)
+│   └── smart-alerts.sh   # Event tracking (v2.1.0)
 └── utilities/            # Helper libraries
-    ├── backup-safety.sh      # Backup target validation (v1.0.0)
+    ├── backup-safety.sh      # Backup target validation (v1.1.0)
     ├── device-detection.sh   # Device detection (v1.0.0)
     ├── path-calculator.sh    # Path utilities (v1.0.0)
     └── retry.sh              # Retry & backoff (v1.0.0)

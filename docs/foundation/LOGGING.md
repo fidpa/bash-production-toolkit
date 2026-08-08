@@ -1,8 +1,8 @@
 # Logging Libraries
 
 This document covers two logging libraries:
-- **logging.sh** (v2.0.0) - Full-featured structured logging (6-level, RFC 5424 aligned)
-- **simple-logging.sh** (v1.1.1) - Lightweight logging for simple scripts
+- **logging.sh** (v2.1.0) - Full-featured structured logging (6-level, RFC 5424 aligned)
+- **simple-logging.sh** (v1.2.0) - Lightweight logging for simple scripts
 
 ## Quick Decision Guide
 
@@ -17,7 +17,7 @@ This document covers two logging libraries:
 
 ---
 
-# logging.sh (v2.0.0)
+# logging.sh (v2.1.0)
 
 Full-featured structured logging with journald integration, JSON output, file rotation, and performance metrics.
 6 log levels aligned with RFC 5424 syslog priorities (DEBUG through CRITICAL).
@@ -317,7 +317,7 @@ log_info "Batch complete"
 
 ---
 
-# simple-logging.sh (v1.0.0)
+# simple-logging.sh (v1.2.0)
 
 Lightweight logging library for git hooks, simple scripts, and cross-platform use.
 

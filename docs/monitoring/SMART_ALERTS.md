@@ -1,4 +1,4 @@
-# Smart Alerts Library (v2.0.0)
+# Smart Alerts Library (v2.1.0)
 
 Advanced event tracking with grace periods and intelligent recovery detection. Prevents alert fatigue from transient issues.
 Uses `send_alert()` from alerts.sh v2.0.0 (webhook-generic, no Telegram dependency).
