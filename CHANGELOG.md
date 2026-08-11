@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-08-11
+
+### Fixed
+- `examples/*.sh` (7 scripts) and `install.sh`: restored the executable bit
+  (`chmod 644` → `755`). `README.md` and `examples/README.md` have always
+  documented direct invocation (`./examples/01-logging-basics.sh`), but the
+  files themselves were not executable — following the docs literally failed
+  with `Permission denied`. `bash examples/01-logging-basics.sh` still worked
+  as a workaround, which is why the regression went unnoticed. No script
+  content changed.
+
 ## [2.4.2] - 2026-08-08
 
 Maintenance release. No library code changed — every version number in the
@@ -161,7 +172,8 @@ send_alert "BACKUP_FAILED" "Disk full"
 - Comprehensive documentation (12 docs)
 - CI/CD pipeline with ShellCheck linting
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.2...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.3...HEAD
+[2.4.3]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/fidpa/bash-production-toolkit/compare/v2.3.0...v2.4.0
