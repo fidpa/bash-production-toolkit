@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.7] - 2026-08-27: The editorial section states what holds, not how much did not
+
+A release page says what now holds. How long something was wrong and how many statements a
+check did not survive address the maintainer, not the reader, and they push the corrections
+themselves into the background. The rule this repository follows now is that the tally
+stays out of the release page while every correction keeps its own entry, with its effect
+and its anchor in the code.
+
+### Changed
+- **The `[2.4.4]` section opens with what was put right, not with a count of what was
+  wrong.** Its introduction no longer carries the number of corrected statements or the
+  span of time they had stood. Each correction stays exactly where it was, as its own
+  entry with its effect and its file, function or tag reference.
+
+### Upgrade notes
+
+Nothing to do. No library file, function name, configuration variable or measured value
+changed in this release. What changed is the wording of one changelog paragraph.
+
 ## [2.4.6] - 2026-08-27: Release notes match the tag they are published under
 
 A release whose headline mentions another version number used to make the workflow serve
@@ -51,9 +70,8 @@ Nothing to do. This release changes one paragraph of changelog text.
 Editorial release. No library code changed. Every section below 2.4.4 was rewritten
 against a written rule set for release messages: entries now lead with what changes for
 an operator instead of with the code that changed, each release gets an opening paragraph
-that names the symptom before the fix, and the file is plain ASCII. Three factual errors
-that had been public since February, July and August 2026 were corrected in the process;
-they are listed below rather than silently fixed.
+that names the symptom before the fix, and the file is plain ASCII. Statements of fact are
+corrected where the repository contradicted them; they are listed below.
 
 ### Fixed
 - **A breaking change shipped in 2.1.0 was documented as a documentation update.** The
@@ -412,7 +430,8 @@ documentation and a linting pipeline.
 - A CI pipeline running ShellCheck over the libraries
   (`.github/workflows/lint.yml`).
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.6...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.7...HEAD
+[2.4.7]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.6...v2.4.7
 [2.4.6]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...v2.4.6
 [2.4.5]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.4...v2.4.5
 [2.4.4]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.3...v2.4.4
