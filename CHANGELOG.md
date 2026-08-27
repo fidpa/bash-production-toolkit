@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-08-27: Release notes match the tag they are published under
+
+A release whose headline mentions another version number used to make the workflow serve
+the wrong section. Tagging v2.4.5, whose headline reads "One unsupported claim removed
+from the 2.4.0 section", meant that an extraction for version 2.4.0 matched the 2.4.5
+heading first, because the match was a plain substring search over the whole line.
+
+### Fixed
+- **The release workflow selects a changelog section by its heading, not by a substring
+  anywhere in the line.** `.github/workflows/release.yml` matches the literal prefix
+  `## [VERSION]` at column 1 via awk's `index()`. A regex was not an option here: the
+  brackets need escaping that does not survive the shell, and an unescaped `[` turns the
+  pattern into a character class that matches nothing. Both the body extraction and the
+  title extraction added in 2.4.4 used the substring form. If no section matches, the
+  body extraction still fails the workflow and the title still falls back to the bare tag
+  name.
+
+### Upgrade notes
+
+Nothing to do. This release changes CI behaviour only, and only for future tags.
+
 ## [2.4.5] - 2026-08-27: One unsupported claim removed from the 2.4.0 section
 
 Follow-up to the editorial pass in 2.4.4. No library code changed. A sentence that pass
@@ -391,7 +412,8 @@ documentation and a linting pipeline.
 - A CI pipeline running ShellCheck over the libraries
   (`.github/workflows/lint.yml`).
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.6...HEAD
+[2.4.6]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...v2.4.6
 [2.4.5]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.4...v2.4.5
 [2.4.4]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.3...v2.4.4
 [2.4.3]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.2...v2.4.3

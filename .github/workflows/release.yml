@@ -21,8 +21,16 @@ jobs:
         id: changelog
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
-          awk -v ver="$VERSION" '
-            /^## \[/ { if (p) exit; if (index($0, ver)) p=1; next }
+
+          # Match the literal heading prefix "## [VERSION]" at column 1, via index()
+          # rather than a regex: the brackets would need escaping that does not survive
+          # the shell, and a plain substring search would also hit a heading that merely
+          # mentions another version in its headline, serving that text under the wrong tag.
+          HEADING="## [${VERSION}]"
+
+          awk -v head="$HEADING" '
+            index($0, head) == 1 { p=1; next }
+            /^## \[/ { if (p) exit }
             p { print }
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md || { echo "Empty release notes for $VERSION"; exit 1; }
@@ -30,8 +38,8 @@ jobs:
           # Release title: "vX.Y.Z: <headline>". The headline is the trailing part of the
           # section heading after the date. Without it action-gh-release falls back to the
           # bare tag name, which duplicates the version already shown next to it.
-          HEADLINE=$(awk -v ver="$VERSION" '
-            /^## \[/ && index($0, ver) {
+          HEADLINE=$(awk -v head="$HEADING" '
+            index($0, head) == 1 {
               if (match($0, /- [0-9]{4}-[0-9]{2}-[0-9]{2}: /)) {
                 print substr($0, RSTART + RLENGTH); exit
               }
