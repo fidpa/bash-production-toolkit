@@ -18,6 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Extract changelog section
+        id: changelog
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           awk -v ver="$VERSION" '
@@ -26,9 +27,26 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           test -s release-notes.md || { echo "Empty release notes for $VERSION"; exit 1; }
 
+          # Release title: "vX.Y.Z: <headline>". The headline is the trailing part of the
+          # section heading after the date. Without it action-gh-release falls back to the
+          # bare tag name, which duplicates the version already shown next to it.
+          HEADLINE=$(awk -v ver="$VERSION" '
+            /^## \[/ && index($0, ver) {
+              if (match($0, /- [0-9]{4}-[0-9]{2}-[0-9]{2}: /)) {
+                print substr($0, RSTART + RLENGTH); exit
+              }
+            }
+          ' CHANGELOG.md)
+          if [ -n "$HEADLINE" ]; then
+            echo "title=v${VERSION}: ${HEADLINE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "title=v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.changelog.outputs.title }}
           body_path: release-notes.md
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
