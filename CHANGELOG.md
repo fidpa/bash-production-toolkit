@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.5] - 2026-08-27: One unsupported claim removed from the 2.4.0 section
+
+Follow-up to the editorial pass in 2.4.4. No library code changed. A sentence that pass
+had left standing turned out to have no basis in the repository.
+
+### Fixed
+- **The 2.4.0 section no longer claims a semantics that was never documented.** It read
+  "This matches the semantics `log_error_structured()` had always documented". Neither
+  `src/foundation/logging.sh` nor `docs/foundation/LOGGING.md` says anything about
+  `ERROR` and `CRITICAL` bypassing the level check, at `v1.0.0` or at `v2.3.0`; the
+  function carries no doc comment at all. The behaviour the entry describes is real, only
+  the justification was not. The entry now states what changed and why it matters,
+  without appealing to documentation that does not exist.
+
+### Upgrade notes
+
+Nothing to do. This release changes one paragraph of changelog text.
+
 ## [2.4.4] - 2026-08-27: Editorial pass over the changelog
 
 Editorial release. No library code changed. Every section below 2.4.4 was rewritten
@@ -130,8 +148,10 @@ level filtering when two of the toolkit's own libraries were loaded together.
   `systemctl stop` then escalates to SIGKILL after `TimeoutStopSec`. The trap is gone,
   and with it the `ORIGINAL_PWD` machinery: the library only changes directory in
   subshells, so the caller's working directory never needs restoring.
-- **`ERROR` and `CRITICAL` messages are logged regardless of `LOG_LEVEL`.** This matches
-  the semantics `log_error_structured()` had always documented.
+- **`ERROR` and `CRITICAL` messages are logged regardless of `LOG_LEVEL`.** Raising
+  `LOG_LEVEL` past `ERROR` used to suppress them along with everything else, which meant
+  a quieter log level could hide the failures it was least meant to hide. The level check
+  in `log_structured()` no longer applies to those two levels.
 - **Exported log functions work in a fresh child shell.** `get_log_level_value` and
   `log_info_structured` were missing from the `export -f` lists in `logging.sh`, so
   `bash -c` and `xargs bash` callers hit "command not found"; the configuration variables
@@ -371,7 +391,8 @@ documentation and a linting pipeline.
 - A CI pipeline running ShellCheck over the libraries
   (`.github/workflows/lint.yml`).
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.4...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...HEAD
+[2.4.5]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.4...v2.4.5
 [2.4.4]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.3...v2.4.4
 [2.4.3]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.1...v2.4.2
