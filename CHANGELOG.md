@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.8] - 2026-08-28: GitHub identifies the project as MIT-licensed
+
+### Changed
+
+- **The repository page shows the MIT licence, and licence-filtered searches
+  find the project.** `LICENSE` carried the repository URL on its own line
+  under the copyright notice. GitHub reads a licence text with an extra line as
+  modified and reports `NOASSERTION`, which leaves the licence field on the
+  repository page empty. The line is gone; the MIT text and the copyright
+  notice are byte-for-byte unchanged, and the URL is still in `README.md`.
+
 ## [2.4.7] - 2026-08-27: The editorial section states what holds, not how much did not
 
 A release page says what now holds. How long something was wrong and how many statements a
@@ -430,7 +441,8 @@ documentation and a linting pipeline.
 - A CI pipeline running ShellCheck over the libraries
   (`.github/workflows/lint.yml`).
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.7...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.8...HEAD
+[2.4.8]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.7...v2.4.8
 [2.4.7]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.6...v2.4.7
 [2.4.6]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...v2.4.6
 [2.4.5]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.4...v2.4.5
