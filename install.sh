@@ -166,8 +166,8 @@ echo "   export BASH_PRODUCTION_TOOLKIT=\"${PREFIX}\""
 echo "   source \"\${BASH_PRODUCTION_TOOLKIT}/init.sh\""
 echo
 echo "2. Source libraries in your scripts:"
-echo "   source \"\${BASH_TOOLKIT_LIB}/logging.sh\""
-echo "   source \"\${BASH_TOOLKIT_LIB}/secure-file-utils.sh\""
+echo "   source \"\${BASH_TOOLKIT_LIB}/foundation/logging.sh\""
+echo "   source \"\${BASH_TOOLKIT_LIB}/foundation/secure-file-utils.sh\""
 echo
 echo "3. Reload your shell:"
 echo "   source ~/.bashrc"

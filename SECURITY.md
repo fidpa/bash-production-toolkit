@@ -22,8 +22,11 @@ If you discover a security vulnerability in Bash Production Toolkit, please repo
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| 2.x.x   | :white_check_mark: |
+| 1.x.x   | :x:                |
+
+The 1.x line ended with v2.0.0, which removed the Telegram delivery path of
+`alerts.sh`; there are no backports to it.
 
 ## Security Best Practices
 

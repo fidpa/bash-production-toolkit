@@ -125,14 +125,35 @@ send_alert "SYSTEM_TEST" "Hello from bash-production-toolkit!" "🧪"
 |----------|---------|-------------|
 | `SMART_ALERT_GRACE_PERIOD` | `180` | Seconds before alerting |
 | `SMART_ALERT_RECOVERY_THRESHOLD` | `300` | Minimum downtime for recovery alert |
+| `SMART_ALERT_AGGREGATION_WINDOW` | `300` | Seconds in which events are aggregated |
 | `SMART_ALERT_STATE_DIR` | `/var/lib/smart-alerts` | State directory |
+| `SMART_ALERT_ENABLED` | `true` | Any other value makes the event functions return without acting |
 
 ### Device Detection (device-detection.sh)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEVICE_CONFIG_FILE` | `./devices.yml` | Device config path |
+| `DEVICE_CONFIG_FILE` | `devices.yml` next to the library | Device config path, read with yq |
 | `DEVICE_OVERRIDE` | - | Force specific device (testing) |
+
+### Retry & Backoff (retry.sh)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RETRY_BASE_DELAY` | `1` | First delay in seconds, doubled per attempt |
+| `RETRY_MAX_DELAY` | `60` | Cap on the delay |
+| `RETRY_JITTER` | `0` | Random seconds added on top, 0 turns jitter off |
+| `RETRY_DISABLE_LOGGING` | - | Set to any value to skip the logging.sh integration |
+
+### Backup Safety (backup-safety.sh)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKUP_BASE_DIR` | `/opt/backups` | Base directory for `get_backup_path` |
+| `BACKUP_MIN_FREE_GB` | `10` | Free space a backup target must have |
+
+All of these are also listed with their defaults in
+[config/toolkit.env.example](../config/toolkit.env.example).
 
 ## State Directories
 

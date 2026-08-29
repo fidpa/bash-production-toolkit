@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.9] - 2026-08-29: The README states its limits, and the configuration matches the code
+
+### Changed
+
+- **The README states its limits next to its features, and its configuration
+  table matches the code.** The fact pass against the README quality standard
+  turned up a dead anchor (`LOGGING.md#simple-loggingsh`, a heading that does not
+  exist), `jq` listed as optional although `smart-alerts.sh` refuses to load
+  without it, `install.sh` and `config/toolkit.env.example` documented nowhere,
+  and `sfu_write_file` shown with its `600` default while the surrounding text
+  spoke of a config file. The README now carries a Scope section (libraries and
+  not a service, hygiene and not a security boundary, Linux first, one library
+  under unit test), a configuration table with every default read from the source,
+  and the `install.sh --help` output verbatim. `config/toolkit.env.example` gained
+  the `RETRY_*`, `BACKUP_*` and `SMART_ALERT_ENABLED` blocks it was missing, so
+  code, example config and README name the same options, and `docs/SETUP.md`
+  gained the `retry.sh` and `backup-safety.sh` sections plus the two smart-alert
+  variables its tables had never listed.
+
+### Fixed
+
+- **`install.sh` prints a source line that works.** The closing hint offered
+  `source "${BASH_TOOLKIT_LIB}/logging.sh"` without the subdirectory, so
+  following it verbatim after an install failed with "No such file or directory".
+  The libraries keep their `foundation/`, `monitoring/` and `utilities/` layout
+  under the prefix; the hint now says so.
+- **`SECURITY.md` names the version line that is actually maintained.** The table
+  listed 1.x.x as supported and everything below 1.0 as unsupported, unchanged
+  since before v2.0.0. Supported is 2.x.x; the 1.x line ended with the v2.0.0
+  webhook rewrite and gets no backports.
+
 ## [2.4.8] - 2026-08-28: GitHub identifies the project as MIT-licensed
 
 ### Changed
@@ -441,7 +472,8 @@ documentation and a linting pipeline.
 - A CI pipeline running ShellCheck over the libraries
   (`.github/workflows/lint.yml`).
 
-[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.8...HEAD
+[Unreleased]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.9...HEAD
+[2.4.9]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.8...v2.4.9
 [2.4.8]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.7...v2.4.8
 [2.4.7]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.6...v2.4.7
 [2.4.6]: https://github.com/fidpa/bash-production-toolkit/compare/v2.4.5...v2.4.6
